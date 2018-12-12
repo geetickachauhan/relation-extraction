@@ -13,6 +13,8 @@ import random
 from spacy.lang.en.stop_words import STOP_WORDS as stop_words
 nlp = spacy.load('en')
 
+#TODO (geeticka) need to clean up utils based upon the methods that are 
+# not directly used by the script anymore
 # to get the dataset from the cross validation splits
 TRAIN, DEV, TEST = 0, 1, 2
 class Dataset():
@@ -24,8 +26,7 @@ class Dataset():
         assert fold_num < self.K
         data = self.relations_splits[fold_num][data_type]
         return data['sentences'].tolist(), data['relations'].tolist(), data['e1_pos'].tolist(), \
-               data['e2_pos'].tolist(), data['paths'].tolist(), data['paths_e1_pos'].tolist(), \
-               data['paths_e2_pos'].tolist(), data['paths_with_edge_names'].tolist()
+               data['e2_pos'].tolist()
         # we need it in list format
 
     def get_full_data(self):
@@ -502,7 +503,6 @@ def relative_distance(num_data, max_sen_len, e1_pos, e2_pos):
     return dist1, dist2, num_pos
 
 def vectorize(config, data, word_dict):
-    #old parameters: config, data, word_dict, data_hypernyms, hypernym_dict, max_sen_len, max_e1_len, max_e2_len,
     sentences, relations, e1_pos, e2_pos = data
     max_sen_len = config.max_len
     max_e1_len = config.max_e1_len

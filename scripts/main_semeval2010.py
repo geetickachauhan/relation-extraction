@@ -8,16 +8,15 @@ import os
 import sys
 sys.path.append('..')
 import time
-import datetime
 import random
 import uuid # for generating a unique id for the cnn
 
-import relation_extraction.data.utils as utils
+import relation_extraction.data.utils as data_utils
+import main_utils
 #import argparse
 from relation_extraction.models.model import Model
 import parser
 
-import datetime
 import copy
 import json
 
@@ -47,7 +46,7 @@ def res(path): return os.path.join(config.data_root, path)
 TRAIN, DEV, TEST = 0, 1, 2
 #TODO: (geeticka) when you read the dependency paths with labels, use get_only_words
 dataset = \
-utils.Dataset(res('pickled-files/seed_{K}_10-dep-dir-fold-border_{N}.pkl').format(K=config.pickle_seed,
+data_utils.Dataset(res('pickled-files/seed_{K}_10-dep-dir-fold-border_{N}.pkl').format(K=config.pickle_seed,
     N=config.border_size))
 print("border size:", 'pickled-files/seed_{K}_10-dep-dir-fold-border_{N}.pkl'.format(K=config.pickle_seed,
     N=config.border_size))
@@ -134,19 +133,6 @@ def run_epoch(session, model, batch_iter, epoch, verbose=True, is_training=True)
 # vectorize will have different sizes for train and test depending on whether the data is truncated to
 # not include the paths as a different column
 
-# a function to open the file and return a list consisting of the lines in the file
-# this is needed to create the dev file from the train file, otherwise a TypeError is thrown because
-# when a file is originally opened, it is of type '_io.TextIOWrapper'
-def openFileAsList(filename):
-    with open(filename) as f:
-        mylist = [line.rstrip('\n') for line in f]
-    return mylist
-
-# let us remove the depedency data
-#split the data, and get the dependency information for the non cross validated data
-def preprocess_data_noncrossvalidated(data):
-    data = utils.split_data_cut_sentence(data, config.border_size)
-    return data
 
 
 
@@ -157,16 +143,19 @@ def init():
     if config.log_file is None:
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(message)s', datefmt='%m-%d %H:%M')
     else:
-        if not os.path.exists(config.save_path): os.makedirs(config.save_path)
+        main_utils.create_folder_if_not_exists(config.save_path)
 
         logging.basicConfig(
             filename=config.log_file, filemode='a', level=logging.DEBUG, format='%(asctime)s %(message)s',
             datefmt='%m-%d %H:%M'
         )
+
+
+    # setting the train, dev and test data
     if config.fold is None and config.cross_validate is False:
         config.train_text_dataset_file = res(config.train_text_dataset_path)
         config.test_text_dataset_file = res(config.test_text_dataset_path)
-        train_data = openFileAsList(config.train_text_dataset_file)
+        train_data = main_utils.openFileAsList(config.train_text_dataset_file)
         test_data = open(config.test_text_dataset_file, 'r')
     elif config.fold is None and config.cross_validate is True:
         print('Error: Fold is not None but cross validate is True')
@@ -178,10 +167,10 @@ def init():
         test_data = dataset.get_data_for_fold(config.fold, TEST)
 
     # now each of the above data contains the following in order:
-    # sentences, relations, e1_pos, e2_pos, paths, paths_e1_pos, paths_e2_pos, paths_with_edge_names
+    # sentences, relations, e1_pos, e2_pos
 
     # if you are using the pickle file with unsplit sentences, you will do the following:
-    # random select dev set
+    # random select dev set when there is no cross validation
     if config.cross_validate is False:
         if config.use_test is False:
             devsize = int(len(train_data)*0.15)
@@ -196,11 +185,11 @@ def init():
         elif config.use_test is True:
             dev_data = open(config.test_text_dataset_file, 'r') # means we will report test scores
         # split data
-        train_data = preprocess_data_noncrossvalidated(train_data)
-        dev_data = preprocess_data_noncrossvalidated(dev_data)
-        test_data = preprocess_data_noncrossvalidated(test_data)
+        train_data = main_utils.preprocess_data_noncrossvalidated(train_data, config.border_size)
+        dev_data = main_utils.preprocess_data_noncrossvalidated(dev_data, config.border_size)
+        test_data = main_utils.preprocess_data_noncrossvalidated(test_data, config.border_size)
         if config.use_test is False and config.early_stop is True:
-            early_stop_data = preprocess_data_noncrossvalidated(early_stop_data)
+            early_stop_data = main_utils.preprocess_data_noncrossvalidated(early_stop_data, config.border_size)
         elif config.use_test is True and config.early_stop is True:
             raise NotImplemented
 
@@ -239,46 +228,28 @@ def init():
 
     if config.early_stop is True:
         all_data = all_data + early_stop_data_addition
-    word_dict = utils.build_dict(all_data, config.remove_stop_words, config.low_freq_thresh)
+    word_dict = data_utils.build_dict(all_data, config.remove_stop_words, config.low_freq_thresh)
     logging.info('total words: %d' % len(word_dict))
 
-    embeddings = utils.load_embedding_senna(config, word_dict)
+    embeddings = data_utils.load_embedding_senna(config, word_dict)
 
-    # grabbing the length of the longest sentence in each of the train, test and dev
-    max_len_train = len(max(train_data[0], key=lambda x:len(x)))
-    max_len_dev = len(max(dev_data[0], key=lambda x:len(x)))
-    max_len_test = len(max(test_data[0], key=lambda x:len(x)))
-    config.max_len = max(max_len_train, max_len_dev, max_len_test)
-    # config.max_len = max(max_len_train, max_len_test)
-
-    # max entity lengths, computing them via subtraction because
-    # we have access to the positions of the words inside of the sentence
-    max_e1_len_train = max(map(lambda x: x[1]-x[0]+1, train_data[2]))
-    max_e1_len_dev = max(map(lambda x: x[1]-x[0]+1, dev_data[2]))
-    max_e1_len_test = max(map(lambda x: x[1]-x[0]+1, test_data[2]))
-    config.max_e1_len = max(max_e1_len_train, max_e1_len_dev, max_e1_len_test)
-    # config.max_e1_len = max(max_e1_len_train, max_e1_len_test)
-
-    max_e2_len_train = max(map(lambda x: x[1]-x[0]+1, train_data[3]))
-    max_e2_len_dev = max(map(lambda x: x[1]-x[0]+1, dev_data[3]))
-    max_e2_len_test = max(map(lambda x: x[1]-x[0]+1, test_data[3]))
-    config.max_e2_len = max(max_e2_len_train, max_e2_len_dev, max_e2_len_test)
+    config.max_len = main_utils.max_length_all_data(train_data[0], dev_data[0], test_data[0], 'sentence')
+    config.max_e1_len = main_utils.max_length_all_data(train_data[2], dev_data[2], test_data[2], 'entity')
+    config.max_e2_len = main_utils.max_length_all_data(train_data[3], dev_data[3], test_data[3], 'entity')
 
     if config.early_stop is True:
-        max_len_earlystop = len(max(early_stop_data[0], key=lambda x:len(x)))
-        max_e1_len_earlystop = max(map(lambda x: x[1]-x[0]+1, early_stop_data[2]))
-        max_e2_len_earlystop = max(map(lambda x: x[1]-x[0]+1, early_stop_data[3]))
-        max_len_dep_earlystop = len(max(early_stop_data[index], key=lambda x:len(x) if x is not None else 0))
+        max_len_earlystop = main_utils.max_sent_len(early_stop_data[0])
+        max_e1_len_earlystop = main_utils.max_ent_len(early_stop_data[2])
+        max_e2_len_earlystop = main_utils.max_ent_len(early_stop_data[3])
         config.max_len = max(config.max_len, max_len_earlystop)
         config.max_e1_len = max(config.max_e1_len, max_e1_len_earlystop)
         config.max_e2_len = max(config.max_e2_len, max_e2_len_earlystop)
-        config.max_len_dep = max(config.max_len_dep, max_len_dep_earlystop)
 
-    train_vec = utils.vectorize(config, train_data, word_dict)
-    test_vec = utils.vectorize(config, test_data, word_dict)
-    dev_vec = utils.vectorize(config, dev_data, word_dict)
+    train_vec = data_utils.vectorize(config, train_data, word_dict)
+    test_vec = data_utils.vectorize(config, test_data, word_dict)
+    dev_vec = data_utils.vectorize(config, dev_data, word_dict)
     if config.early_stop is True:
-        early_stop_vec = utils.vectorize(config, early_stop_data, word_dict)
+        early_stop_vec = data_utils.vectorize(config, early_stop_data, word_dict)
 
     # finally I need the original entity info in the test file
     # previously there was [] as the input
@@ -289,122 +260,17 @@ def init():
         return embeddings, train_vec, dev_vec, test_vec, dev_data_orin, early_stop_vec, early_stop_data_orin
 
     return embeddings, train_vec, dev_vec, test_vec, dev_data_orin
-    # return embeddings, train_vec, test_vec, test_data[1]
-    # need to return the relations for the test data in the last part
 
-def test_writer(scores, answer_path):
-        np.save(answer_path, scores)
-        answer_txt_path = answer_path.replace('npy', 'txt')
-        # scores = scores.tolist()
-        with open(answer_txt_path, 'w') as inFile:
-                for score in scores:
-                        inFile.write('\t'.join([str(item) for item in score])+'\n')
 
-        if config.cross_validate is False:
-            print('Answer file writting done!')
-
-def test_writer_for_perl_evaluation(relations, preds, answer_dict, answer_path):
-        # all_relations = relations_dev_df['Left Entity'].unique().tolist()
-        #for testfile you will want to write down starting from 8001 as the sentence ID
-        # if you use Di's key file
-        # basically rewrite this such that you now accept data in Di's format
-        # data is going to be the test file, preds is predictions, answer_dict is the relations dictionary
-        # answer_path is where to store these files
-        sentence = 1
-        output_filepath_gold = answer_path.replace('.txt', '') +'_gold.txt'
-        with open(answer_path, 'w') as outFile_prediction, open(output_filepath_gold, 'w') as outFile_gold:
-                for relation, pred in zip(relations, preds):
-                        # argument1 =  entity.split('(')[1].split(',')[0]
-                        # if argument1 not in all_relations: continue
-                        # relation = '(' + ''.join(entity.split('(')[1:])
-                        # outFile_prediction.write('{0}{1}\n'.format(answer_dict[pred], relation))
-                        # outFile_gold.write('{0}\n'.format(entity))
-                        outFile_prediction.write('{0}\t{1}\n'.format(sentence, answer_dict[pred]))
-                        outFile_gold.write('{0}\t{1}\n'.format(sentence, answer_dict[relation]))
-                        sentence += 1
-        #print('Answer file writing done!')
-        return output_filepath_gold
-
-def read_macro_f1_from_result_file(result_filepath):
-        '''
-        Retrieve the macro F1 score from the result file that perl eval/semeval2018_task7_scorer-v1.2.pl generates
-        '''
-        result_file = open(result_filepath, 'r')
-        for cur_line in result_file:
-                if cur_line.startswith('<<< The official score is'):
-                        cur_line = cur_line.replace('<<< The official score is (9+1)-way evaluation with directionality taken into account: macro-averaged F1 = ','')
-                        cur_line = cur_line.replace('% >>>','')
-                        macro_f1 = float(cur_line)
-        result_file.close()
-        return macro_f1
-
-def get_current_date():
-    '''
-    https://www.saltycrane.com/blog/2008/06/how-to-get-current-date-and-time-in/
-    '''
-    now = datetime.datetime.now()
-    return str(now.year) + '-' + str(now.month) + '-' + str(now.day)
-    # this is solely used to identify when the command to start the experiment was run
-
-def get_current_time_in_seconds():
-        '''
-        http://stackoverflow.com/questions/415511/how-to-get-current-time-in-python
-        '''
-        return(time.strftime("%Y-%m-%d_%H-%M-%S", time.gmtime()))
-
-def get_current_time_in_miliseconds():
-        '''
-        http://stackoverflow.com/questions/5998245/get-current-time-in-milliseconds-in-python
-        '''
-        return(get_current_time_in_seconds() + '-' + str(datetime.datetime.now().microsecond))
-
-def create_folder_if_not_exists(dir):
-        '''
-        Create the folder if it doesn't exist already.
-        '''
-        if not os.path.exists(dir):
-                os.makedirs(dir)
-
-# given data that has different lists for relations, sentences etc,
-# combine them such that relation and sentence etc are combined per entry
-# eg: if sentence was [0,1] and relation was [5,6]
-# return value would be [0,5] and [1,6]
-def stack_data(data):
-    return list(zip(*data))
-
-#read the macro F1 from the necessary filepath
-def evaluate(result_filepath, answer_filepath, data_orin, preds):
-    output_filepath_gold = test_writer_for_perl_evaluation(
-        data_orin, preds, relation_dict, answer_filepath
-    )
-    command = (
-        "perl eval/semeval2010_task8_scorer-v1.2.pl {0} {1} > {2}"
-        "".format(
-            answer_filepath, output_filepath_gold, result_filepath
-        )
-    )
-
-    os.system(command)
-    macro_f1 = read_macro_f1_from_result_file(result_filepath)
-    return macro_f1
-
+# This method performs the work of creating the necessary output folders for the model
 def output_model(config):
-    #parameters['data_augmentation'] = config.data_augmentation
-    train_start_time_in_miliseconds = get_current_time_in_miliseconds()
+    train_start_time_in_miliseconds = main_utils.get_current_time_in_miliseconds()
     config.train_start_folds.append(train_start_time_in_miliseconds)
-    #TODO: update this based on whatever hyperparameter changes you make
-    #hyperparameters = ['hyp_embed_size', 'hyp_embed_reduce']
     results, parameters = parser.get_results_dict(config, train_start_time_in_miliseconds)
     hyperparameters = ['dataset', 'pos_embed_size', 'num_filters', 'filter_sizes', 'keep_prob', 'early_stop', 'patience']
     hyperparam_dir_addition = '-'.join(['{}_{:.6f}'.format(parameter, parameters[parameter]) if
             type(parameters[parameter])==float else '{}_{}'.format(parameter,
                 parameters[parameter]) for parameter in hyperparameters])
-#    config.add_hyperparam_details = "Di's code + senna embeddings" + \ + " Early Stop: " + \
-#    str(config.early_stop) + " Patience: " + str(config.patience) + " Pickle Seed: " + str(config.pickle_seed) + \
-#    " Removing stop words: " + str(config.remove_stop_words) + " Low frequency words threshold: " + \
-#    str(config.low_freq_thresh) + " Seed for initializer" + str(config.seed) + \
-#    " ; use the full train and test: " + str(config.use_test)
-    #config.add_hyperparam_details = "No cross validation with WPE: dev results reported are actually on test data"
 
     if config.fold is not None and config.cross_validate is True:
         model_name = 'cnn_{0}'.format(str(config.id) + '_' + train_start_time_in_miliseconds +'-'+ 'Fold-'+
@@ -413,7 +279,6 @@ def output_model(config):
         model_name = 'cnn_{0}'.format(str(config.id) + '_' + train_start_time_in_miliseconds+ hyperparam_dir_addition)
     
     config.parameters = parameters
-    create_folder_if_not_exists(config.output_dir)
     if config.fold is not None and config.cross_validate is True:
         folder_string = "CrossValidation"
         config.output_folder = os.path.join(config.output_dir, "CrossValidation", model_name, 'Fold'+str(config.fold))
@@ -426,9 +291,9 @@ def output_model(config):
     config.result_folder = os.path.join(config.output_dir, folder_string, model_name, 'Result')
     print("Tensorboard folder, shared across all folds, different for each run is",
             config.tensorboard_folder)
-    create_folder_if_not_exists(config.output_folder)
-    create_folder_if_not_exists(config.tensorboard_folder)
-    create_folder_if_not_exists(config.result_folder)
+    main_utils.create_folder_if_not_exists(config.output_folder)
+    main_utils.create_folder_if_not_exists(config.tensorboard_folder)
+    main_utils.create_folder_if_not_exists(config.result_folder)
     config.test_answer_filepath = os.path.join(config.output_folder, config.test_answer_file)
 
     return results, parameters, model_name
@@ -479,11 +344,11 @@ def main():
                 try:
                     for epoch in range(config.num_epoches):
                         results['epoch'][epoch] = {}
-                        train_iter = utils.batch_iter(config.seed, stack_data(train_vec), bz, shuffle=True)
-                        dev_iter   = utils.batch_iter(config.seed, stack_data(dev_vec),   bz, shuffle=False)
-                        test_iter  = utils.batch_iter(config.seed, stack_data(test_vec),  bz, shuffle=False)
+                        train_iter = data_utils.batch_iter(config.seed, main_utils.stack_data(train_vec), bz, shuffle=True)
+                        dev_iter   = data_utils.batch_iter(config.seed, main_utils.stack_data(dev_vec),   bz, shuffle=False)
+                        test_iter  = data_utils.batch_iter(config.seed, main_utils.stack_data(test_vec),  bz, shuffle=False)
                         if config.early_stop is True:
-                            early_stop_iter = utils.batch_iter(config.seed, stack_data(early_stop_vec), bz, shuffle=False)
+                            early_stop_iter = data_utils.batch_iter(config.seed, main_utils.stack_data(early_stop_vec), bz, shuffle=False)
                         train_verbosity = False if config.cross_validate is False else True
                         train_acc, _ = run_epoch(session, m_train, train_iter, epoch, verbose=False)
 
@@ -497,21 +362,9 @@ def main():
                             config.output_folder, config.dev_answer_file
                         )
 
-                        macro_f1_dev = evaluate(config.result_filepath, config.dev_answer_filepath,
-                                dev_data_orin, dev_preds)
+                        macro_f1_dev = main_utils.evaluate(config.result_filepath, config.dev_answer_filepath,
+                                relation_dict, dev_data_orin, dev_preds)
 
-#                        output_filepath_gold = test_writer_for_perl_evaluation(
-#                            dev_data_orin, dev_preds, relation_dict, config.dev_answer_filepath
-#                        )
-#                        command = (
-#                            "perl eval/semeval2010_task8_scorer-v1.2.pl {0} {1} > {2}"
-#                            "".format(
-#                                config.dev_answer_filepath, output_filepath_gold, config.result_filepath
-#                            )
-#                        )
-#
-#                        os.system(command)
-#                        macro_f1 = read_macro_f1_from_result_file(config.result_filepath)
                         if config.early_stop is True:
                             early_stop_acc, early_stop_preds = run_epoch(
                                     session, m_eval, early_stop_iter, epoch, verbose=False, is_training=False
@@ -586,16 +439,14 @@ if __name__ == '__main__':
         assert len(config.lr_boundaries) == len(config.lr_values) - 1
 
         # create the necessary output folders
-        create_folder_if_not_exists('output/' + config.dataset + '/')
-        config.output_dir = 'output/' + config.dataset + '/'
+        config.output_dir = '/scratch/geeticka/relation-extraction/output/' + config.dataset + '/'
+        main_utils.create_folder_if_not_exists(config.output_dir)
         config.id = uuid.uuid4()
-        date = get_current_date() # this is to get the date when the experiment was started,
+        date = main_utils.get_current_date() # this is to get the date when the experiment was started,
         # not necessarily when the training started
 
         # see https://stackoverflow.com/questions/34344836/will-hashtime-time-always-be-unique
 
-        # config.tensorboard_folder = 'output/' + config.dataset + '/Tensorboard/'
-        # config.result_folder = 'output/' + config.dataset + '/Result/'
         print("Cross validate is ", config.cross_validate)
 
 
@@ -638,9 +489,6 @@ if __name__ == '__main__':
                 )
             start_index = len(result_dataframe.index)
             curr_fold = 0
-            # lr_string = str(config.lr_values) + " " + str(config.lr_boundaries)
-            # if config.sgd_momentum is True:
-            #     lr_string = lr_string + " " + "momentum: " + str(config.momentum)
             params_to_exclude = ['train_start_folds']
             parms_to_add_to_df = {key: parameters[key] for key in parameters if key not in params_to_exclude}
             for i in range(start_index, start_index + num_folds):
