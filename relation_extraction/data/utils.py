@@ -10,6 +10,7 @@ import nltk
 nltk.download('wordnet')
 from nltk import wordnet as wn
 import random
+import h5py # conda install -c conda-forge h5py
 from spacy.lang.en.stop_words import STOP_WORDS as stop_words
 nlp = spacy.load('en')
 
@@ -621,6 +622,15 @@ def convert_labels(read_file, save_file):
                                 line = [str(label)] + line[1:] + ['\n']
                                 outfile.write(' '.join(line))
 
+# read the elmo embeddings for the train and the test file
+def get_elmo_embeddings(filename):
+    h5py_file = h5py.File(filename, 'r')
+    elmo_embeddings = []
+    # the h5py file contains one extra index for a new line character so must ignore that
+    for i in range(0, len(h5py_file) - 1):
+        embedding = h5py_file.get(str(i))
+        elmo_embeddings.append(np.array(embedding))
+    return (elmo_embeddings, )
 
 # this function first split the line of data into relation, entities and sentence
 # then cut the sentence according to the required border size

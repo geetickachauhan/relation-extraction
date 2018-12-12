@@ -10,28 +10,29 @@ class Model(object):
         n    = config.max_len
         dc   = config.num_filters
         nr   = config.classnum # number of relations; don't pass via config. Some other way.
-
+        elmo_es = 1024 #elmo embedding size
+        elmo_layers = 3 # elmo language model layers
         keep_prob = config.keep_prob
 
         # Inputs
         # Sentences
-        in_x     = tf.placeholder(dtype=tf.int32, shape=[None, n],                 name='in_x')
+        in_x     = tf.placeholder(dtype=tf.int32, shape=[None, n],                          name='in_x')
         # Positions
-        in_dist1 = tf.placeholder(dtype=tf.int32, shape=[None, n],                 name='in_dist1')
-        in_dist2 = tf.placeholder(dtype=tf.int32, shape=[None, n],                 name='in_dist2')
+        in_dist1 = tf.placeholder(dtype=tf.int32, shape=[None, n],                          name='in_dist1')
+        in_dist2 = tf.placeholder(dtype=tf.int32, shape=[None, n],                          name='in_dist2')
         # Entities
-        in_e1    = tf.placeholder(dtype=tf.int32, shape=[None, config.max_e1_len], name='in_e1')
-        in_e2    = tf.placeholder(dtype=tf.int32, shape=[None, config.max_e2_len], name='in_e2')
+        in_e1    = tf.placeholder(dtype=tf.int32, shape=[None, config.max_e1_len],          name='in_e1')
+        in_e2    = tf.placeholder(dtype=tf.int32, shape=[None, config.max_e2_len],          name='in_e2')
 
         # Labels
-        in_y     = tf.placeholder(dtype=tf.int32, shape=[None],                    name='in_y')
+        in_y     = tf.placeholder(dtype=tf.int32, shape=[None],                              name='in_y')
         # epoch
-        in_epoch = tf.placeholder(dtype=tf.int32, shape=[],                           name='epoch')
+        in_epoch = tf.placeholder(dtype=tf.int32, shape=[],                                  name='epoch')
 
         # embeddings
         embed = tf.get_variable(initializer=embeddings, dtype=tf.float32, name='word_embed')
         # 3 is num of layers in LM and 1024 is hidden layer dimension in the elmo model, to be converted to variable
-        in_elmo = tf.placeholder(dtype=tf.float32, shape=[None, 3, n, 1024],       name='in_elmo')
+        in_elmo = tf.placeholder(dtype=tf.float32, shape=[None, elmo_layers, n, elmo_es],     name='in_elmo')
 
         self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_elmo)
         # TODO(geeticka): Don't comment out, control with a switch. config.verbosity_level.
@@ -81,7 +82,7 @@ class Model(object):
         # main convolution (sentence and word position embeddings)
         # x: (batch_size, max_len, embdding_size, 1)
         # w: (filter_size, embdding_size, 1, num_filters)
-        d = dw+2*dp
+        d = dw + elmo_es + 2*dp
         list_to_concatenate = [x, elmo_weighted_sum, dist1, dist2]
         h_pool_flat, filter_sizes = self.simple_convolution(n, d, list_to_concatenate,
                 config.filter_sizes, dc, keep_prob, is_training, '', initializer, regularizer)

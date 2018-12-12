@@ -160,7 +160,7 @@ def get_results_dict(config, train_start_time_in_miliseconds):
     parameters['early_stop_size'] = config.early_stop_size
     parameters['cross_validate'] = config.cross_validate
     parameters['use_test'] = config.use_test
-    parser['use_elmo'] = config.use_elmo
+    parameters['use_elmo'] = config.use_elmo
     #parameters['dev_size'] = config.dev_size
     #parameters['use_lemmas'] = config.use_lemmas
     # parameters['fold'] = config.fold

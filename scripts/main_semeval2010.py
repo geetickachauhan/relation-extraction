@@ -190,7 +190,6 @@ def init():
             test_elmo = data_utils.get_elmo_embeddings(res('elmo/test-elmo-full.hdf5'))
             train_data = train_data + train_elmo
             dev_data = dev_data + test_elmo # in this case this is actually the test data
-            dev_data = test_data
 
         if config.use_test is False and config.early_stop is True:
             early_stop_data = main_utils.preprocess_data_noncrossvalidated(early_stop_data, config.border_size)
