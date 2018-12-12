@@ -12,9 +12,9 @@ import datetime
 import random
 import uuid # for generating a unique id for the cnn
 
-import relation_extraction.data.utils
+import relation_extraction.data.utils as utils
 #import argparse
-from relation_extraction.data.models.model import Model
+from relation_extraction.models.model import Model
 import parser
 
 import datetime
@@ -394,18 +394,24 @@ def output_model(config):
     config.train_start_folds.append(train_start_time_in_miliseconds)
     #TODO: update this based on whatever hyperparameter changes you make
     #hyperparameters = ['hyp_embed_size', 'hyp_embed_reduce']
-    results, parameters = get_results_dict(config, train_start_time_in_miliseconds)
-    hyperparameters = ['id', 'dataset', 'pos_embed_size', 'num_filters', 'filter_sizes', 'keep_prob', 'early_stop', 'patience']
+    results, parameters = parser.get_results_dict(config, train_start_time_in_miliseconds)
+    hyperparameters = ['dataset', 'pos_embed_size', 'num_filters', 'filter_sizes', 'keep_prob', 'early_stop', 'patience']
     hyperparam_dir_addition = '-'.join(['{}_{:.6f}'.format(parameter, parameters[parameter]) if
             type(parameters[parameter])==float else '{}_{}'.format(parameter,
                 parameters[parameter]) for parameter in hyperparameters])
-    config.add_hyperparam_details = "Di's code + senna embeddings" + \ + " Early Stop: " + \
-    str(config.early_stop) + " Patience: " + str(config.patience) + " Pickle Seed: " + str(config.pickle_seed) + \
-    " Removing stop words: " + str(config.remove_stop_words) + " Low frequency words threshold: " + \
-    str(config.low_freq_thresh) + " Seed for initializer" + str(config.seed) + \
-    " ; use the full train and test: " + str(config.use_test)
+#    config.add_hyperparam_details = "Di's code + senna embeddings" + \ + " Early Stop: " + \
+#    str(config.early_stop) + " Patience: " + str(config.patience) + " Pickle Seed: " + str(config.pickle_seed) + \
+#    " Removing stop words: " + str(config.remove_stop_words) + " Low frequency words threshold: " + \
+#    str(config.low_freq_thresh) + " Seed for initializer" + str(config.seed) + \
+#    " ; use the full train and test: " + str(config.use_test)
     #config.add_hyperparam_details = "No cross validation with WPE: dev results reported are actually on test data"
 
+    if config.fold is not None and config.cross_validate is True:
+        model_name = 'cnn_{0}'.format(str(config.id) + '_' + train_start_time_in_miliseconds +'-'+ 'Fold-'+
+            str(config.fold) + hyperparam_dir_addition)
+    else:
+        model_name = 'cnn_{0}'.format(str(config.id) + '_' + train_start_time_in_miliseconds+ hyperparam_dir_addition)
+    
     config.parameters = parameters
     create_folder_if_not_exists(config.output_dir)
     if config.fold is not None and config.cross_validate is True:
@@ -441,17 +447,11 @@ def main():
         # Add some logging
 
 
-        results, parameters = output_model(config)
+        results, parameters, model_name = output_model(config)
         # above method is general and so below I am adding stff specific to folds
         parameters['fold'] = config.fold
         results['fold'] = config.fold
         results['epoch'] = {}
-        if config.fold is not None and config.cross_validate is True:
-            parameters['fold'] = config.fold
-            model_name = 'cnn_{0}'.format(train_start_time_in_miliseconds +'-'+ 'Fold-'+
-                str(config.fold) + hyperparam_dir_addition)
-        else:
-            model_name = 'cnn_{0}'.format(train_start_time_in_miliseconds+ hyperparam_dir_addition)
 
         # below is code for running the model itself
         with tf.Graph().as_default():

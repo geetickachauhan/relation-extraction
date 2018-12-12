@@ -503,11 +503,10 @@ def relative_distance(num_data, max_sen_len, e1_pos, e2_pos):
 
 def vectorize(config, data, word_dict):
     #old parameters: config, data, word_dict, data_hypernyms, hypernym_dict, max_sen_len, max_e1_len, max_e2_len,
-    sentences, relations, e1_pos, e2_pos, paths, e1_pos_dep, e2_pos_dep, paths_with_edge_names = data
+    sentences, relations, e1_pos, e2_pos = data
     max_sen_len = config.max_len
     max_e1_len = config.max_e1_len
     max_e2_len = config.max_e2_len
-    max_dep_len = config.max_len_dep # shortest dependency path without the labels
     num_data = len(sentences)
     local_max_e1_len = max(list(map(lambda x: x[1]-x[0]+1, e1_pos)))
     local_max_e2_len = max(list(map(lambda x: x[1]-x[0]+1, e2_pos)))
@@ -517,19 +516,13 @@ def vectorize(config, data, word_dict):
     sents_vec = np.zeros((num_data, max_sen_len), dtype=int)
     e1_vec = np.zeros((num_data, max_e1_len), dtype=int)
     e2_vec = np.zeros((num_data, max_e2_len), dtype=int)
-    deps_vec = np.zeros((num_data, max_dep_len), dtype=int)
     # dist1 and dist2 are defined in the compute distance function
 
-    if config.use_dep_labels is True: paths_to_use = paths_with_edge_names
-    else: paths_to_use = paths
 
-    for idx, (sent, pos1, pos2, path) in enumerate(zip(sentences, e1_pos, e2_pos, paths_to_use)):
+    for idx, (sent, pos1, pos2) in enumerate(zip(sentences, e1_pos, e2_pos)):
         # all unseen words are mapped to the index 0
         vec = [word_dict[w] if w in word_dict else 0 for w in sent]
         sents_vec[idx, :len(vec)] = vec
-        if path is not None:
-            dep_vec = [word_dict[w] if w in word_dict else 0 for w in path]
-            deps_vec[idx, :len(dep_vec)] = dep_vec
 
         # for the particular sentence marked by idx, set the entry as the vector gotten from above
         # which is basically just a list of the indexes of the words
@@ -548,9 +541,8 @@ def vectorize(config, data, word_dict):
                     e2_vec[idx, ii] = vec[pos2[-1]]
 
     dist1, dist2, num_pos = relative_distance(num_data, max_sen_len, e1_pos, e2_pos)
-    dist1_dep, dist2_dep, num_pos_dep = relative_distance(num_data, max_dep_len, e1_pos_dep, e2_pos_dep)
 
-    return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2, deps_vec, dist1_dep, dist2_dep
+    return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2
 
 def pos(x):
         '''

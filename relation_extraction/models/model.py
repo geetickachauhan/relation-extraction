@@ -9,7 +9,6 @@ class Model(object):
         np   = config.pos_embed_num
         n    = config.max_len
         dc   = config.num_filters
-        dc_dep = config.num_filters_dep
         nr   = config.classnum # number of relations; don't pass via config. Some other way.
 
         keep_prob = config.keep_prob
@@ -28,8 +27,7 @@ class Model(object):
         in_y     = tf.placeholder(dtype=tf.int32, shape=[None],                    name='in_y')
         # epoch
         in_epoch = tf.placeholder(dtype=tf.int32, shape=[],                           name='epoch')
-        self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_dep, in_dist1_dep, in_dist2_dep,
-                in_epoch)
+        self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch)
         # embeddings
         embed = tf.get_variable(initializer=embeddings, dtype=tf.float32, name='word_embed')
         # TODO(geeticka): Don't comment out, control with a switch. config.verbosity_level.
@@ -55,7 +53,6 @@ class Model(object):
         x     = tf.nn.embedding_lookup(embed,      in_x,     name='x')   # bz,n,dw
         dist1 = tf.nn.embedding_lookup(pos1_embed, in_dist1, name='dist1')#bz, n, k,dp
         dist2 = tf.nn.embedding_lookup(pos2_embed, in_dist2, name='dist2')# bz, n, k,dp
-        dep   = tf.nn.embedding_lookup(embed,      in_dep,   name='dep')
         # y = tf.nn.embedding_lookup(rel_embed, in_y, name='y')# bz, dc
 
         # build regularizer

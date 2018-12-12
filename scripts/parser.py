@@ -1,5 +1,6 @@
 import argparse
-
+import copy
+import time
 #Arguments that must be provided: dataset, id,
 # Arguments that are commonly provided: cross validate, use_test
 parser = argparse.ArgumentParser()
@@ -17,7 +18,7 @@ parser.add_argument('--pos_embed_num', default=123, type=int,
                                         help="number of positions")
 # parser.add_argument('--pos_embed_num_dep', default=123, type=int,
 #                                         help='number of positions for dep positions')
-parser.add_argument('--classnum', default=classnum, type=int,
+parser.add_argument('--classnum', default=18, type=int,
                                         help="number of output class")
 parser.add_argument('--num_filters', default=100, type=int,
                                         help="number of convolution filters")
@@ -50,10 +51,10 @@ parser.add_argument('--seed', default=1, type=int,
 #                                                 help='parameter used by gradient clipping')
 parser.add_argument('--early_stop', default=False, type=bool,
                                                 help='whether to do early stop')
-# parser.add_argument('--remove_stop_words', default=False, type=bool,
-#                                                 help='whether to send all stop words to 0 index')
-# parser.add_argument('--low_freq_thresh', default=0, type=int,
-#                                                 help='what frequency of word to send to 0 index')
+parser.add_argument('--remove_stop_words', default=False, type=bool,
+                                                 help='whether to send all stop words to 0 index')
+parser.add_argument('--low_freq_thresh', default=0, type=int,
+                                                 help='what frequency of word to send to 0 index')
 
 # Optimization related arguments
 parser.add_argument('--num_epoches', default=250, type=int,
@@ -128,7 +129,7 @@ def get_results_dict(config, train_start_time_in_miliseconds):
     results = {} # this dictionary will contain all the result of the experiment    results['model_options'] = copy.copy(model_options)
     parameters = {}
     parameters['dataset'] = config.dataset
-    # parameters['id'] = config.id
+    parameters['id'] = config.id
     parameters['pos_embed_size'] = config.pos_embed_size
     parameters['pos_embed_num'] = config.pos_embed_num
     parameters['num_filters'] = config.num_filters
