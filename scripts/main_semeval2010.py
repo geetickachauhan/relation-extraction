@@ -151,12 +151,11 @@ def init():
         )
 
 
-    # setting the train, dev and test data
+    # setting the train, dev data; pretend that test data does not exist
     if config.fold is None and config.cross_validate is False:
         config.train_text_dataset_file = res(config.train_text_dataset_path)
         config.test_text_dataset_file = res(config.test_text_dataset_path)
         train_data = main_utils.openFileAsList(config.train_text_dataset_file)
-        test_data = open(config.test_text_dataset_file, 'r')
     elif config.fold is None and config.cross_validate is True:
         print('Error: Fold is not None but cross validate is True')
         logging.info('Error: Fold is not None but cross validate is True')
@@ -164,7 +163,6 @@ def init():
     else:
         train_data = dataset.get_data_for_fold(config.fold)
         dev_data = dataset.get_data_for_fold(config.fold, DEV)
-        test_data = dataset.get_data_for_fold(config.fold, TEST)
 
     # now each of the above data contains the following in order:
     # sentences, relations, e1_pos, e2_pos
@@ -187,7 +185,6 @@ def init():
         # split data
         train_data = main_utils.preprocess_data_noncrossvalidated(train_data, config.border_size)
         dev_data = main_utils.preprocess_data_noncrossvalidated(dev_data, config.border_size)
-        test_data = main_utils.preprocess_data_noncrossvalidated(test_data, config.border_size)
         if config.use_test is False and config.early_stop is True:
             early_stop_data = main_utils.preprocess_data_noncrossvalidated(early_stop_data, config.border_size)
         elif config.use_test is True and config.early_stop is True:
@@ -212,15 +209,15 @@ def init():
 
     logging.info('size of train data: %d' % len(train_data[0]))
     logging.info('size of dev data: %d' % len(dev_data[0]))
-    logging.info('size of test data: %d' % len(test_data[0]))
     if config.early_stop is True:
         logging.info('size of early stop data: %d' % len(early_stop_data[0]))
     print("early stop is", config.early_stop)
     print("lr_values and boundaries are", config.lr_values, config.lr_boundaries)
     print("seed for random initialization is ",  config.seed)
 
-    # Build vocab
-    all_data = train_data[0] + dev_data[0] + test_data[0]
+    # Build vocab, pretend that your test set does not exist because when you need to use test 
+    # set, you can just make sure that what we report on (i.e. dev set here) is actually the test data
+    all_data = train_data[0] + dev_data[0]
     if config.early_stop is False:
         early_stop_data = dev_data
     #TODO: (geeticka) improve the above; handle the situation when the early stop data is non existant
@@ -233,9 +230,9 @@ def init():
 
     embeddings = data_utils.load_embedding_senna(config, word_dict)
 
-    config.max_len = main_utils.max_length_all_data(train_data[0], dev_data[0], test_data[0], 'sentence')
-    config.max_e1_len = main_utils.max_length_all_data(train_data[2], dev_data[2], test_data[2], 'entity')
-    config.max_e2_len = main_utils.max_length_all_data(train_data[3], dev_data[3], test_data[3], 'entity')
+    config.max_len = main_utils.max_length_all_data(train_data[0], dev_data[0], 'sentence')
+    config.max_e1_len = main_utils.max_length_all_data(train_data[2], dev_data[2], 'entity')
+    config.max_e2_len = main_utils.max_length_all_data(train_data[3], dev_data[3], 'entity')
 
     if config.early_stop is True:
         max_len_earlystop = main_utils.max_sent_len(early_stop_data[0])
@@ -246,7 +243,6 @@ def init():
         config.max_e2_len = max(config.max_e2_len, max_e2_len_earlystop)
 
     train_vec = data_utils.vectorize(config, train_data, word_dict)
-    test_vec = data_utils.vectorize(config, test_data, word_dict)
     dev_vec = data_utils.vectorize(config, dev_data, word_dict)
     if config.early_stop is True:
         early_stop_vec = data_utils.vectorize(config, early_stop_data, word_dict)
@@ -257,9 +253,9 @@ def init():
     if config.early_stop is True:
         print("returning the early stop data")
         early_stop_data_orin = early_stop_data[1]
-        return embeddings, train_vec, dev_vec, test_vec, dev_data_orin, early_stop_vec, early_stop_data_orin
+        return embeddings, train_vec, dev_vec, dev_data_orin, early_stop_vec, early_stop_data_orin
 
-    return embeddings, train_vec, dev_vec, test_vec, dev_data_orin
+    return embeddings, train_vec, dev_vec, dev_data_orin
 
 
 # This method performs the work of creating the necessary output folders for the model
@@ -301,10 +297,10 @@ def output_model(config):
 def main():
 
         if config.early_stop is True:
-            embeddings, train_vec, dev_vec, test_vec, dev_data_orin, early_stop_vec, \
+            embeddings, train_vec, dev_vec, dev_data_orin, early_stop_vec, \
             early_stop_data_orin = init()
         else:
-            embeddings, train_vec, dev_vec, test_vec, dev_data_orin = init()
+            embeddings, train_vec, dev_vec, dev_data_orin = init()
         # embeddings, train_vec, test_vec, test_relations = init()
         bz = config.batch_size
 
@@ -346,7 +342,6 @@ def main():
                         results['epoch'][epoch] = {}
                         train_iter = data_utils.batch_iter(config.seed, main_utils.stack_data(train_vec), bz, shuffle=True)
                         dev_iter   = data_utils.batch_iter(config.seed, main_utils.stack_data(dev_vec),   bz, shuffle=False)
-                        test_iter  = data_utils.batch_iter(config.seed, main_utils.stack_data(test_vec),  bz, shuffle=False)
                         if config.early_stop is True:
                             early_stop_iter = data_utils.batch_iter(config.seed, main_utils.stack_data(early_stop_vec), bz, shuffle=False)
                         train_verbosity = False if config.cross_validate is False else True

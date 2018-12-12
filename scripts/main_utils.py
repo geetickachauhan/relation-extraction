@@ -18,13 +18,12 @@ def max_ent_len(data):
 # given the data, find the maximum length
 def max_sent_len(data): return len(max(data, key=lambda x:len(x)))
 
-# whether to retun the max length for sentence or entity in the train, dev and test data
-def max_length_all_data(train, dev, test, kind='sentence'):
+# whether to retun the max length for sentence or entity in the train, dev data
+def max_length_all_data(train, dev, kind='sentence'):
     function = max_sent_len if kind == 'sentence' else max_ent_len
     max_train = function(train)
     max_dev = function(dev)
-    max_test = function(test)
-    return max(max_train, max_dev, max_test)
+    return max(max_train, max_dev)
 
 # a function to open the file and return a list consisting of the lines in the file
 # this is needed to create the dev file from the train file, otherwise a TypeError is thrown because
