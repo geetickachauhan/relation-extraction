@@ -185,6 +185,13 @@ def init():
         # split data
         train_data = main_utils.preprocess_data_noncrossvalidated(train_data, config.border_size)
         dev_data = main_utils.preprocess_data_noncrossvalidated(dev_data, config.border_size)
+        if config.use_test is True:
+            train_elmo = data_utils.get_elmo_embeddings(res('elmo/train-elmo-full.hdf5'))
+            test_elmo = data_utils.get_elmo_embeddings(res('elmo/test-elmo-full.hdf5'))
+            train_data = train_data + train_elmo
+            dev_data = dev_data + test_elmo # in this case this is actually the test data
+            dev_data = test_data
+
         if config.use_test is False and config.early_stop is True:
             early_stop_data = main_utils.preprocess_data_noncrossvalidated(early_stop_data, config.border_size)
         elif config.use_test is True and config.early_stop is True:
@@ -215,7 +222,7 @@ def init():
     print("lr_values and boundaries are", config.lr_values, config.lr_boundaries)
     print("seed for random initialization is ",  config.seed)
 
-    # Build vocab, pretend that your test set does not exist because when you need to use test 
+    # Build vocab, pretend that your test set does not exist because when you need to use test
     # set, you can just make sure that what we report on (i.e. dev set here) is actually the test data
     all_data = train_data[0] + dev_data[0]
     if config.early_stop is False:

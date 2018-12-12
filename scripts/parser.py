@@ -6,7 +6,7 @@ import time
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='semeval2010',
                                         help='the dataset for which the task is being applied')
-parser.add_argument('--id', default='baseline', # this will get overwritten in the code by uuid 
+parser.add_argument('--id', default='baseline', # this will get overwritten in the code by uuid
                                         help="a name for identifying the model")
 parser.add_argument('--pos_embed_size', default=25, type=int,
                                         help="position feature embedding size")
@@ -106,6 +106,8 @@ parser.add_argument('--cross_validate', default=False, type=bool,\
                                                 help='whether to implement cross validation')
 parser.add_argument('--use_test', default=False, type=bool,
                                                 help='use the full train and test data split')
+parser.add_argument('--use_elmo', default=True, type=bool,
+                                                help='use the elmo embeddings')
 parser.add_argument('--hyperparam_tuning_mode', default=False, type=bool,
                                                 help='whether hyperparameter tuning mode was on')
 
@@ -158,6 +160,7 @@ def get_results_dict(config, train_start_time_in_miliseconds):
     parameters['early_stop_size'] = config.early_stop_size
     parameters['cross_validate'] = config.cross_validate
     parameters['use_test'] = config.use_test
+    parser['use_elmo'] = config.use_elmo
     #parameters['dev_size'] = config.dev_size
     #parameters['use_lemmas'] = config.use_lemmas
     # parameters['fold'] = config.fold
