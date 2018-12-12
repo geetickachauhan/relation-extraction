@@ -273,10 +273,10 @@ def output_model(config):
                 parameters[parameter]) for parameter in hyperparameters])
 
     if config.fold is not None and config.cross_validate is True:
-        model_name = 'cnn_{0}'.format(str(config.id) + '_' + train_start_time_in_miliseconds +'-'+ 'Fold-'+
+        model_name = 'cnn_{0}'.format(config.id + '_' + train_start_time_in_miliseconds +'-'+ 'Fold-'+
             str(config.fold) + hyperparam_dir_addition)
     else:
-        model_name = 'cnn_{0}'.format(str(config.id) + '_' + train_start_time_in_miliseconds+ hyperparam_dir_addition)
+        model_name = 'cnn_{0}'.format(config.id + '_' + train_start_time_in_miliseconds+ hyperparam_dir_addition)
     
     config.parameters = parameters
     if config.fold is not None and config.cross_validate is True:
@@ -441,7 +441,7 @@ if __name__ == '__main__':
         # create the necessary output folders
         config.output_dir = '/scratch/geeticka/relation-extraction/output/' + config.dataset + '/'
         main_utils.create_folder_if_not_exists(config.output_dir)
-        config.id = uuid.uuid4()
+        config.id = str(uuid.uuid4())
         date = main_utils.get_current_date() # this is to get the date when the experiment was started,
         # not necessarily when the training started
 
