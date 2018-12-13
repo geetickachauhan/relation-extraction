@@ -457,7 +457,7 @@ if __name__ == '__main__':
 
             # code to dump the data
             result = {}
-            parameters, _ = get_results_dict(config, 0) # we don't care about second val and we also don't care about individual training time here
+            parameters, _ = parser.get_results_dict(config, 0) # we don't care about second val and we also don't care about individual training time here
             parameters['train_start_folds'] = config.train_start_folds
             result['model_options'] = copy.copy(parameters)
             result['macro_f1_folds'] = config.macro_f1_folds
