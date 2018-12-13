@@ -207,7 +207,7 @@ def init():
             train_data = train_data + train_elmo
             dev_data = dev_data + test_elmo # in this case this is actually the test data
         elif config.use_test is False and config.use_elmo is True:
-            raise NotImplemented # cannot use elmo embeddings with a randomly sampled dev set 
+            raise NotImplementedError('Cannot use elmo embeddings with a randomly sampled dev set')
 
         if config.use_test is False and config.early_stop is True:
             early_stop_data = main_utils.preprocess_data_noncrossvalidated(early_stop_data, config.border_size)
