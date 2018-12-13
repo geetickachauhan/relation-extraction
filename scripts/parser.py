@@ -1,7 +1,7 @@
 import argparse
 import copy
 import time
-#Arguments that must be provided: dataset, id,
+#Arguments that must be provided: dataset, use_elmo
 # Arguments that are commonly provided: cross validate, use_test
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='semeval2010',
@@ -106,8 +106,8 @@ parser.add_argument('--cross_validate', default=False, type=bool,\
                                                 help='whether to implement cross validation')
 parser.add_argument('--use_test', default=False, type=bool,
                                                 help='use the full train and test data split')
-parser.add_argument('--use_elmo', default=True, type=bool,
-                                                help='use the elmo embeddings')
+parser.add_argument('--use_elmo', default=False, required=True, type=bool,
+                                                help='whether to use the elmo embeddings')
 parser.add_argument('--hyperparam_tuning_mode', default=False, type=bool,
                                                 help='whether hyperparameter tuning mode was on')
 

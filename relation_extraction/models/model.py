@@ -31,10 +31,14 @@ class Model(object):
 
         # embeddings
         embed = tf.get_variable(initializer=embeddings, dtype=tf.float32, name='word_embed')
-        # 3 is num of layers in LM and 1024 is hidden layer dimension in the elmo model, to be converted to variable
-        in_elmo = tf.placeholder(dtype=tf.float32, shape=[None, elmo_layers, n, elmo_es],     name='in_elmo')
+        if config.use_elmo is True:
+            # 3 is num of layers in LM and 1024 is hidden layer dimension in the elmo model, to be converted to variable
+            in_elmo = tf.placeholder(dtype=tf.float32, shape=[None, elmo_layers, n, elmo_es],     name='in_elmo')
 
-        self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_elmo)
+        if config.use_elmo is True:
+            self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_elmo)
+        else:
+            self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch)
         # TODO(geeticka): Don't comment out, control with a switch. config.verbosity_level.
         #print("Embeddings shape", embed.shape)
         #print("in_dep shape", in_dep.shape)
@@ -49,24 +53,24 @@ class Model(object):
         pos2_embed = tf.get_variable(initializer=initializer,shape=[np, dp], name='position2_embed')
         # rel_embed = tf.get_variable(initializer=initializer,shape=[nr, dc], name='relation_embed')
 
-        # based upon https://stackoverflow.com/questions/50175913/tensorflow-replacing-feeding-a-placeholder-of-a-graph-with-tf-variable
-        elmo_weights = tf.get_variable('elmo_weights', [1], trainable=False)
-        elmo_weights = in_elmo + elmo_weights
-        print("Shape of in_elmo", in_elmo.shape)
-        print("Shape of elmo weights", elmo_weights.shape)
-        tf.summary.histogram("elmo_weights", elmo_weights)
-        # referring to https://github.com/allenai/bilm-tf/blob/master/bilm/elmo.py in order to
-        # generate the weighted sum of the elmo embeddings
-        # there is also a how to https://github.com/allenai/allennlp/blob/master/tutorials/how_to/elmo.md
-        # which is helpful because they provide suggestions on the different hyperparameters
-        elmo_weighted_sum = self.elmo_weight_layers(elmo_weights)
-        print("elmo weighted sum", elmo_weighted_sum.shape)
-
+        if config.use_elmo is True:
+            # based upon https://stackoverflow.com/questions/50175913/tensorflow-replacing-feeding-a-placeholder-of-a-graph-with-tf-variable
+            elmo_weights = tf.get_variable('elmo_weights', [1], trainable=False)
+            elmo_weights = in_elmo + elmo_weights
+            print("Shape of in_elmo", in_elmo.shape)
+            print("Shape of elmo weights", elmo_weights.shape)
+            tf.summary.histogram("elmo_weights", elmo_weights)
+            # referring to https://github.com/allenai/bilm-tf/blob/master/bilm/elmo.py in order to
+            # generate the weighted sum of the elmo embeddings
+            # there is also a how to https://github.com/allenai/allennlp/blob/master/tutorials/how_to/elmo.md
+            # which is helpful because they provide suggestions on the different hyperparameters
+            elmo_weighted_sum = self.elmo_weight_layers(elmo_weights)
+            print("elmo weighted sum", elmo_weighted_sum.shape)
+            tf.summary.histogram("elmo_weighted_sum", elmo_weighted_sum)
 
         tf.summary.histogram("word_embedding_matrix", embed)
         tf.summary.histogram("position1_embedding_matrix", pos1_embed)
         tf.summary.histogram("position2_embedding_matrix", pos2_embed)
-        tf.summary.histogram("elmo_weighted_sum", elmo_weighted_sum)
 
 
         # embdding lookup
@@ -82,8 +86,13 @@ class Model(object):
         # main convolution (sentence and word position embeddings)
         # x: (batch_size, max_len, embdding_size, 1)
         # w: (filter_size, embdding_size, 1, num_filters)
-        d = dw + elmo_es + 2*dp
-        list_to_concatenate = [x, elmo_weighted_sum, dist1, dist2]
+        if config.use_elmo is True:
+            d = dw + elmo_es + 2*dp
+            list_to_concatenate = [x, elmo_weighted_sum, dist1, dist2]
+        else:
+            d = dw + 2 * dp
+            list_to_concatenate = [x, dist1, dist2]
+
         h_pool_flat, filter_sizes = self.simple_convolution(n, d, list_to_concatenate,
                 config.filter_sizes, dc, keep_prob, is_training, '', initializer, regularizer)
 

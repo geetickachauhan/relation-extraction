@@ -23,15 +23,23 @@ class Dataset():
         with open(relations_split_file, mode='rb') as f: self.relations_splits = pickle.load(f)
         self.K = len(self.relations_splits)
 
-    def get_data_for_fold(self, fold_num, data_type=TRAIN):
+    def get_data_for_fold(self, fold_num, data_type=TRAIN, mode='normal'): # mode can also be elmo
         assert fold_num < self.K
         data = self.relations_splits[fold_num][data_type]
+        if mode == 'elmo':
+            return data['sentences'].tolist(), data['relations'].tolist(), data['e1_pos'].tolist(), \
+                   data['e2_pos'].tolist(), data['elmo_embeddings'].tolist()
         return data['sentences'].tolist(), data['relations'].tolist(), data['e1_pos'].tolist(), \
                data['e2_pos'].tolist()
         # we need it in list format
 
     def get_full_data(self):
         data = pd.concat([self.relations_splits[0][t] for t in [DEV, TEST, TRAIN]])
+        return data.values.tolist()
+
+    # when reporting the scores for the paper, will merge dev and train set and will grab 0th fold of test
+    def get_train_dev_data(self):
+        data = pd.concate([self.relations_splits[0][t] for t in [TRAIN, DEV]])
         return data.values.tolist()
 
 # given a string that looks like a list, parse it into an actual list
@@ -515,7 +523,8 @@ def pad_elmo_embedding(max_len, elmo_embeddings):
     return new_elmo_embeddings
 
 def vectorize(config, data, word_dict):
-    sentences, relations, e1_pos, e2_pos, elmo_embeddings = data
+    if config.use_elmo is True: sentences, relations, e1_pos, e2_pos, elmo_embeddings = data
+    else: sentences, relations, e1_pos, e2_pos = data
     max_sen_len = config.max_len
     max_e1_len = config.max_e1_len
     max_e2_len = config.max_e2_len
@@ -524,7 +533,7 @@ def vectorize(config, data, word_dict):
     local_max_e2_len = max(list(map(lambda x: x[1]-x[0]+1, e2_pos)))
     print('max sen len: {}, local max e1 len: {}, local max e2 len: {}'.format(max_sen_len, local_max_e1_len, local_max_e2_len))
 
-    padded_elmo_embeddings = pad_elmo_embedding(max_sen_len, elmo_embeddings)
+    if config.use_elmo is True: padded_elmo_embeddings = pad_elmo_embedding(max_sen_len, elmo_embeddings)
     # maximum values needed to decide the dimensionality of the vector
     sents_vec = np.zeros((num_data, max_sen_len), dtype=int)
     e1_vec = np.zeros((num_data, max_e1_len), dtype=int)
@@ -555,7 +564,9 @@ def vectorize(config, data, word_dict):
 
     dist1, dist2, num_pos = relative_distance(num_data, max_sen_len, e1_pos, e2_pos)
 
-    return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2, padded_elmo_embeddings
+    if config.use_elmo is True: 
+        return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2, padded_elmo_embeddings
+    return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2
 
 def pos(x):
         '''
