@@ -188,7 +188,7 @@ def init():
         if config.use_test is False and config.early_stop is True:
             early_stop_data = main_utils.preprocess_data_noncrossvalidated(early_stop_data, config.border_size)
         elif config.use_test is True and config.early_stop is True:
-            raise NotImplemented
+            raise NotImplementedError('You cannot do early stopping when using test set.')
 
     # if you are using the pickle file with everything split up and dependency information
     # stored, do the following:
