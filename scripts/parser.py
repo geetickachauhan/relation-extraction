@@ -3,6 +3,7 @@ import copy
 import time
 #Arguments that must be provided: dataset, use_elmo
 # Arguments that are commonly provided: cross validate, use_test
+# boolean arguments should be provided like --cross_validate without any other value
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='semeval2010',
                                         help='the dataset for which the task is being applied')
@@ -49,9 +50,9 @@ parser.add_argument('--seed', default=1, type=int,
 
 # parser.add_argument('--grad_clipping', default=0.01, type=float, \
 #                                                 help='parameter used by gradient clipping')
-parser.add_argument('--early_stop', default=False, type=bool,
+parser.add_argument('--early_stop', default=False, action='store_true',
                                                 help='whether to do early stop')
-parser.add_argument('--remove_stop_words', default=False, type=bool,
+parser.add_argument('--remove_stop_words', default=False, action='store_true',
                                                  help='whether to send all stop words to 0 index')
 parser.add_argument('--low_freq_thresh', default=0, type=int,
                                                  help='what frequency of word to send to 0 index')
@@ -68,7 +69,7 @@ parser.add_argument('--lr_boundaries', default=[60,80], nargs="*",type=int,
 parser.add_argument('--momentum', default=0.9, type=float, \
                                                 help='momentum for SGD with momentum; only valid if' +\
                                                 'sgd_momentum is True')
-parser.add_argument('--sgd_momentum', default=False, type=bool, \
+parser.add_argument('--sgd_momentum', default=False, action='store_true', \
                                                 help='whether to use SGD with momentum')
 # Misc arguments
 parser.add_argument('--save_path', default=None,
@@ -102,13 +103,13 @@ parser.add_argument('--log_file', default=None,
 
 parser.add_argument('--early_stop_size', default=0.1, type=float,
                                                 help='early stop size as a percentage of train set')
-parser.add_argument('--cross_validate', default=False, type=bool,\
+parser.add_argument('--cross_validate', default=False, action='store_true',
                                                 help='whether to implement cross validation')
-parser.add_argument('--use_test', default=False, type=bool,
+parser.add_argument('--use_test', default=False, action='store_true',
                                                 help='use the full train and test data split')
-parser.add_argument('--use_elmo', default=False, required=True, type=bool,
+parser.add_argument('--use_elmo', default=False, action='store_true',
                                                 help='whether to use the elmo embeddings')
-parser.add_argument('--hyperparam_tuning_mode', default=False, type=bool,
+parser.add_argument('--hyperparam_tuning_mode', default=False, action='store_true',
                                                 help='whether hyperparameter tuning mode was on')
 
 #TODO (geeticka) : below is not needed to include in parser
