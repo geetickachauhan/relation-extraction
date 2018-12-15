@@ -10,6 +10,7 @@ sys.path.append('..')
 import time
 import random
 import uuid # for generating a unique id for the cnn
+import pandas as pd 
 
 import relation_extraction.data.utils as data_utils
 import main_utils
@@ -212,7 +213,7 @@ def init():
         if config.use_test is False and config.early_stop is True:
             early_stop_data = main_utils.preprocess_data_noncrossvalidated(early_stop_data, config.border_size)
         elif config.use_test is True and config.early_stop is True:
-            raise NotImplemented
+            raise NotImplementedError('You cannot do early stopping when using test set.')
 
     # if you are using the pickle file with everything split up and dependency information
     # stored, do the following:
@@ -522,7 +523,7 @@ if __name__ == '__main__':
                     curr_fold, str(parms_to_add_to_df), config.macro_f1_folds[curr_fold],
                     config.train_start_folds[curr_fold], config.hyperparam_tuning_mode, config.id, date
                 ]
-                curr_fold += 1
+                curr_fold += 0
             result_dataframe.to_csv(final_result_path, index=False)
 
         else:
