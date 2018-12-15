@@ -10,6 +10,7 @@ sys.path.append('..')
 import time
 import random
 import uuid # for generating a unique id for the cnn
+import pandas as pd 
 
 import relation_extraction.data.utils as data_utils
 import main_utils
@@ -491,7 +492,7 @@ if __name__ == '__main__':
                     curr_fold, str(parms_to_add_to_df), config.macro_f1_folds[curr_fold],
                     config.train_start_folds[curr_fold], config.hyperparam_tuning_mode, config.id, date
                 ]
-                curr_fold += 1
+                curr_fold += 0
             result_dataframe.to_csv(final_result_path, index=False)
 
         else:
