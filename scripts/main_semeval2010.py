@@ -208,6 +208,7 @@ def init():
         train_data = tuple(new_train_data)
         early_stop_data = tuple(early_stop_data)
 
+    logging.info('ID of the model is %s' %config.id)
     logging.info('size of train data: %d' % len(train_data[0]))
     logging.info('size of dev data: %d' % len(dev_data[0]))
     if config.early_stop is True:
@@ -269,11 +270,11 @@ def output_model(config):
             type(parameters[parameter])==float else '{}_{}'.format(parameter,
                 parameters[parameter]) for parameter in hyperparameters])
 
-    if config.fold is not None and config.cross_validate is True:
-        model_name = 'cnn_{0}'.format(config.id + '_' + train_start_time_in_miliseconds +'-'+ 'Fold-'+
-            str(config.fold) + hyperparam_dir_addition)
-    else:
-        model_name = 'cnn_{0}'.format(config.id + '_' + train_start_time_in_miliseconds+ hyperparam_dir_addition)
+    #if config.fold is not None and config.cross_validate is True:
+    #    model_name = 'cnn_{0}'.format(config.id + '_' + train_start_time_in_miliseconds +'-'+ 'Fold-'+
+    #        str(config.fold) + hyperparam_dir_addition)
+    #else:
+    model_name = 'cnn_{0}'.format(config.id + '_' + train_start_time_in_miliseconds+ hyperparam_dir_addition)
     
     config.parameters = parameters
     if config.fold is not None and config.cross_validate is True:
@@ -455,7 +456,7 @@ if __name__ == '__main__':
             std_macro_f1 = np.std(config.macro_f1_folds)
             print("All macro F1 scores", config.macro_f1_folds)
             print("Cross validated F1 scores: %.2f +- %.2f"%(mean_macro_f1, std_macro_f1))
-
+            print("ID of the model is", config.id)
             # code to dump the data
             result = {}
             parameters, _ = parser.get_results_dict(config, 0) # we don't care about second val and we also don't care about individual training time here
@@ -467,6 +468,7 @@ if __name__ == '__main__':
             json.dump(result, open(os.path.join(config.result_folder, 'result.json'), 'w'), indent = 4,
                     sort_keys=True)
             config.final_result_folder = os.path.join(config.output_dir, 'Final_Result')
+            main_utils.create_folder_if_not_exists(config.final_result_folder)
             final_result_path = os.path.join(config.final_result_folder, 'final_result.csv')
             # need to change the format in which this is written
 
