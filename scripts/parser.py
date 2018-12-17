@@ -1,13 +1,13 @@
 import argparse
 import copy
 import time
-#Arguments that must be provided: dataset, id,
+#Arguments that must be provided: dataset, use_elmo
 # Arguments that are commonly provided: cross validate, use_test
 # boolean arguments should be provided like --cross_validate without any other value
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='semeval2010',
                                         help='the dataset for which the task is being applied')
-parser.add_argument('--id', default='baseline', # this will get overwritten in the code by uuid 
+parser.add_argument('--id', default='baseline', # this will get overwritten in the code by uuid
                                         help="a name for identifying the model")
 parser.add_argument('--pos_embed_size', default=25, type=int,
                                         help="position feature embedding size")
@@ -107,6 +107,8 @@ parser.add_argument('--cross_validate', default=False, action='store_true',
                                                 help='whether to implement cross validation')
 parser.add_argument('--use_test', default=False, action='store_true',
                                                 help='use the full train and test data split')
+parser.add_argument('--use_elmo', default=False, action='store_true',
+                                                help='whether to use the elmo embeddings')
 parser.add_argument('--hyperparam_tuning_mode', default=False, action='store_true',
                                                 help='whether hyperparameter tuning mode was on')
 
@@ -161,6 +163,7 @@ def get_results_dict(config, train_start_time_in_miliseconds):
     parameters['early_stop_size'] = config.early_stop_size
     parameters['cross_validate'] = config.cross_validate
     parameters['use_test'] = config.use_test
+    parameters['use_elmo'] = config.use_elmo
     #parameters['dev_size'] = config.dev_size
     #parameters['use_lemmas'] = config.use_lemmas
     # parameters['fold'] = config.fold

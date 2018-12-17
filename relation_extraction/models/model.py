@@ -10,26 +10,35 @@ class Model(object):
         n    = config.max_len
         dc   = config.num_filters
         nr   = config.classnum # number of relations; don't pass via config. Some other way.
-
+        elmo_es = 1024 #elmo embedding size
+        elmo_layers = 3 # elmo language model layers
         keep_prob = config.keep_prob
 
         # Inputs
         # Sentences
-        in_x     = tf.placeholder(dtype=tf.int32, shape=[None, n],                 name='in_x')
+        in_x     = tf.placeholder(dtype=tf.int32, shape=[None, n],                          name='in_x')
         # Positions
-        in_dist1 = tf.placeholder(dtype=tf.int32, shape=[None, n],                 name='in_dist1')
-        in_dist2 = tf.placeholder(dtype=tf.int32, shape=[None, n],                 name='in_dist2')
+        in_dist1 = tf.placeholder(dtype=tf.int32, shape=[None, n],                          name='in_dist1')
+        in_dist2 = tf.placeholder(dtype=tf.int32, shape=[None, n],                          name='in_dist2')
         # Entities
-        in_e1    = tf.placeholder(dtype=tf.int32, shape=[None, config.max_e1_len], name='in_e1')
-        in_e2    = tf.placeholder(dtype=tf.int32, shape=[None, config.max_e2_len], name='in_e2')
+        in_e1    = tf.placeholder(dtype=tf.int32, shape=[None, config.max_e1_len],          name='in_e1')
+        in_e2    = tf.placeholder(dtype=tf.int32, shape=[None, config.max_e2_len],          name='in_e2')
 
         # Labels
-        in_y     = tf.placeholder(dtype=tf.int32, shape=[None],                    name='in_y')
+        in_y     = tf.placeholder(dtype=tf.int32, shape=[None],                              name='in_y')
         # epoch
-        in_epoch = tf.placeholder(dtype=tf.int32, shape=[],                           name='epoch')
-        self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch)
+        in_epoch = tf.placeholder(dtype=tf.int32, shape=[],                                  name='epoch')
+
         # embeddings
         embed = tf.get_variable(initializer=embeddings, dtype=tf.float32, name='word_embed')
+        if config.use_elmo is True:
+            # 3 is num of layers in LM and 1024 is hidden layer dimension in the elmo model, to be converted to variable
+            in_elmo = tf.placeholder(dtype=tf.float32, shape=[None, elmo_layers, n, elmo_es],     name='in_elmo')
+
+        if config.use_elmo is True:
+            self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_elmo)
+        else:
+            self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch)
         # TODO(geeticka): Don't comment out, control with a switch. config.verbosity_level.
         #print("Embeddings shape", embed.shape)
         #print("in_dep shape", in_dep.shape)
@@ -43,9 +52,26 @@ class Model(object):
         pos1_embed = tf.get_variable(initializer=initializer,shape=[np, dp], name='position1_embed')
         pos2_embed = tf.get_variable(initializer=initializer,shape=[np, dp], name='position2_embed')
         # rel_embed = tf.get_variable(initializer=initializer,shape=[nr, dc], name='relation_embed')
+
+        if config.use_elmo is True:
+            # based upon https://stackoverflow.com/questions/50175913/tensorflow-replacing-feeding-a-placeholder-of-a-graph-with-tf-variable
+            elmo_weights = tf.get_variable('elmo_weights', [1], trainable=False)
+            elmo_weights = in_elmo + elmo_weights
+            print("Shape of in_elmo", in_elmo.shape)
+            print("Shape of elmo weights", elmo_weights.shape)
+            tf.summary.histogram("elmo_weights", elmo_weights)
+            # referring to https://github.com/allenai/bilm-tf/blob/master/bilm/elmo.py in order to
+            # generate the weighted sum of the elmo embeddings
+            # there is also a how to https://github.com/allenai/allennlp/blob/master/tutorials/how_to/elmo.md
+            # which is helpful because they provide suggestions on the different hyperparameters
+            elmo_weighted_sum = self.elmo_weight_layers(elmo_weights)
+            print("elmo weighted sum", elmo_weighted_sum.shape)
+            tf.summary.histogram("elmo_weighted_sum", elmo_weighted_sum)
+
         tf.summary.histogram("word_embedding_matrix", embed)
         tf.summary.histogram("position1_embedding_matrix", pos1_embed)
         tf.summary.histogram("position2_embedding_matrix", pos2_embed)
+
 
         # embdding lookup
         # e1 = tf.nn.embedding_lookup(embed, in_e1, name='e1')# bz,dw
@@ -60,8 +86,13 @@ class Model(object):
         # main convolution (sentence and word position embeddings)
         # x: (batch_size, max_len, embdding_size, 1)
         # w: (filter_size, embdding_size, 1, num_filters)
-        d = dw+2*dp
-        list_to_concatenate = [x, dist1, dist2]
+        if config.use_elmo is True:
+            d = dw + elmo_es + 2*dp
+            list_to_concatenate = [x, elmo_weighted_sum, dist1, dist2]
+        else:
+            d = dw + 2 * dp
+            list_to_concatenate = [x, dist1, dist2]
+
         h_pool_flat, filter_sizes = self.simple_convolution(n, d, list_to_concatenate,
                 config.filter_sizes, dc, keep_prob, is_training, '', initializer, regularizer)
 
@@ -145,6 +176,53 @@ class Model(object):
         self.merged_summary = tf.summary.merge_all()
         self.writer = tf.summary.FileWriter(config.tensorboard_folder)
         self.writer.add_graph(tf.get_default_graph())
+
+    # Inspired from https://github.com/allenai/bilm-tf/blob/master/bilm/elmo.py
+    # the authors suggest not to do layer normalization, so I am not going to worry about that
+    def elmo_weight_layers(self, elmo_weights):
+        # Recommended hyperparameter
+        #settings on https://github.com/allenai/allennlp/blob/master/tutorials/how_to/elmo.md
+        # not doing layer norm, add some dropout in the next layer of the network
+        # in the reference code, mask is used for layer norm so i don't need it
+        # adding l2 regularization
+        n_lm_layers = 3
+        def _l2_regularizer(weights):
+            return 0.001 * tf.reduce_sum(tf.square(weights))
+        # set l2 regularization of 0.001
+
+        W = tf.get_variable('Elmo_weight',
+                shape=(n_lm_layers,),
+                initializer = tf.zeros_initializer,
+                regularizer = _l2_regularizer,
+                trainable = True,
+        )
+        normed_weights = tf.split(
+                tf.nn.softmax(W + 1.0/n_lm_layers), n_lm_layers
+        )
+        tf.summary.histogram("elmo_weights for weighted sum", normed_weights)
+        # split the LM layers from (num_samples, 3, words, 1024) to
+        # 3 tensors of shapes (num_samples, words, 1024)
+        layers = tf.split(elmo_weights, n_lm_layers, axis = 1)
+
+        # compute the weighted, normalized LM activations
+        pieces = []
+        for w, t in zip(normed_weights, layers):
+            pieces.append(w * tf.squeeze(t, squeeze_dims=1))
+        sum_pieces = tf.add_n(pieces)
+
+        # the code has a regularization op, which I am not sure how to use at the moment so I will skip
+        gamma = tf.get_variable('Elmo_gamma',
+                shape=(1,),
+                initializer=tf.ones_initializer,
+                regularizer=None,
+                trainable=True,
+        )
+        tf.summary.histogram("elmo_gamma", gamma)
+        weighted_lm_layers = sum_pieces * gamma
+
+        return weighted_lm_layers
+        # need to return the weighted sum of the hidden layer, with the gamma operator
+        # the weights need to be trainable
 
     def simple_convolution(self, max_sen_len, dim, list_to_concatenate, filter_sizes,
             filter_dimension, keep_prob, is_training, prefix, initializer, regularizer):

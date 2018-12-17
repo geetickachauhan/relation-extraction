@@ -10,10 +10,11 @@ import nltk
 nltk.download('wordnet')
 from nltk import wordnet as wn
 import random
+import h5py # conda install -c conda-forge h5py
 from spacy.lang.en.stop_words import STOP_WORDS as stop_words
 nlp = spacy.load('en')
 
-#TODO (geeticka) need to clean up utils based upon the methods that are 
+#TODO (geeticka) need to clean up utils based upon the methods that are
 # not directly used by the script anymore
 # to get the dataset from the cross validation splits
 TRAIN, DEV, TEST = 0, 1, 2
@@ -22,9 +23,12 @@ class Dataset():
         with open(relations_split_file, mode='rb') as f: self.relations_splits = pickle.load(f)
         self.K = len(self.relations_splits)
 
-    def get_data_for_fold(self, fold_num, data_type=TRAIN):
+    def get_data_for_fold(self, fold_num, data_type=TRAIN, mode='normal'): # mode can also be elmo
         assert fold_num < self.K
         data = self.relations_splits[fold_num][data_type]
+        if mode == 'elmo':
+            return data['sentences'].tolist(), data['relations'].tolist(), data['e1_pos'].tolist(), \
+                   data['e2_pos'].tolist(), data['elmo_embeddings'].tolist()
         return data['sentences'].tolist(), data['relations'].tolist(), data['e1_pos'].tolist(), \
                data['e2_pos'].tolist()
         # we need it in list format
@@ -33,10 +37,15 @@ class Dataset():
         data = pd.concat([self.relations_splits[0][t] for t in [DEV, TEST, TRAIN]])
         return data.values.tolist()
 
+    # when reporting the scores for the paper, will merge dev and train set and will grab 0th fold of test
+    def get_train_dev_data(self):
+        data = pd.concate([self.relations_splits[0][t] for t in [TRAIN, DEV]])
+        return data.values.tolist()
+
 # given a string that looks like a list, parse it into an actual list
 def argument_to_list(argument):
     return list(map(float, argument.strip('[]').split(',')))
-    
+
 # Given a string like "word_1" return "word"
 # basically the word ends with _number and we want to split that up
 def get_only_word(string):
@@ -502,8 +511,20 @@ def relative_distance(num_data, max_sen_len, e1_pos, e2_pos):
     num_pos = max(np.amax(dist1), np.amax(dist2)) - min(np.amin(dist1), np.amin(dist2))
     return dist1, dist2, num_pos
 
+def pad_elmo_embedding(max_len, elmo_embeddings):
+    new_elmo_embeddings = []
+    for i in range(0, len(elmo_embeddings)):
+        sentence = elmo_embeddings[i]
+        num_of_words_to_pad = max_len - sentence.shape[1]
+        array_to_pad = np.zeros(shape=(sentence.shape[0], num_of_words_to_pad, sentence.shape[2]),
+        dtype='float32')
+        appended_array = np.append(sentence, array_to_pad, axis=1)
+        new_elmo_embeddings.append(appended_array)
+    return new_elmo_embeddings
+
 def vectorize(config, data, word_dict):
-    sentences, relations, e1_pos, e2_pos = data
+    if config.use_elmo is True: sentences, relations, e1_pos, e2_pos, elmo_embeddings = data
+    else: sentences, relations, e1_pos, e2_pos = data
     max_sen_len = config.max_len
     max_e1_len = config.max_e1_len
     max_e2_len = config.max_e2_len
@@ -512,6 +533,7 @@ def vectorize(config, data, word_dict):
     local_max_e2_len = max(list(map(lambda x: x[1]-x[0]+1, e2_pos)))
     print('max sen len: {}, local max e1 len: {}, local max e2 len: {}'.format(max_sen_len, local_max_e1_len, local_max_e2_len))
 
+    if config.use_elmo is True: padded_elmo_embeddings = pad_elmo_embedding(max_sen_len, elmo_embeddings)
     # maximum values needed to decide the dimensionality of the vector
     sents_vec = np.zeros((num_data, max_sen_len), dtype=int)
     e1_vec = np.zeros((num_data, max_e1_len), dtype=int)
@@ -542,6 +564,8 @@ def vectorize(config, data, word_dict):
 
     dist1, dist2, num_pos = relative_distance(num_data, max_sen_len, e1_pos, e2_pos)
 
+    if config.use_elmo is True: 
+        return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2, padded_elmo_embeddings
     return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2
 
 def pos(x):
@@ -609,6 +633,15 @@ def convert_labels(read_file, save_file):
                                 line = [str(label)] + line[1:] + ['\n']
                                 outfile.write(' '.join(line))
 
+# read the elmo embeddings for the train and the test file
+def get_elmo_embeddings(filename):
+    h5py_file = h5py.File(filename, 'r')
+    elmo_embeddings = []
+    # the h5py file contains one extra index for a new line character so must ignore that
+    for i in range(0, len(h5py_file) - 1):
+        embedding = h5py_file.get(str(i))
+        elmo_embeddings.append(np.array(embedding))
+    return (elmo_embeddings, )
 
 # this function first split the line of data into relation, entities and sentence
 # then cut the sentence according to the required border size

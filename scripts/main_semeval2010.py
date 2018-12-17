@@ -46,11 +46,17 @@ def res(path): return os.path.join(config.data_root, path)
 
 TRAIN, DEV, TEST = 0, 1, 2
 #TODO: (geeticka) when you read the dependency paths with labels, use get_only_words
+if config.use_elmo is True: 
+    prefix = 'elmo/'
+    middle = ''
+else: 
+    prefix = ''
+    middle = '-dep-dir'
 dataset = \
-data_utils.Dataset(res('pickled-files/seed_{K}_10-dep-dir-fold-border_{N}.pkl').format(K=config.pickle_seed,
-    N=config.border_size))
-print("border size:", 'pickled-files/seed_{K}_10-dep-dir-fold-border_{N}.pkl'.format(K=config.pickle_seed,
-    N=config.border_size))
+data_utils.Dataset(res(prefix+'pickled-files/seed_{K}_10{middle}-fold-border_{N}.pkl').format(K=config.pickle_seed,
+    N=config.border_size, middle=middle))
+print("border size:", prefix+'pickled-files/seed_{K}_10{middle}-fold-border_{N}.pkl'.format(K=config.pickle_seed,
+    N=config.border_size, middle=middle))
 
 date_of_experiment_start = None
 
@@ -73,7 +79,7 @@ def accuracy(preds, labels):
     # correct[labels==18] = 1
     return correct.sum()
 
-def run_epoch(session, model, batch_iter, epoch, verbose=True, is_training=True):
+def run_epoch(session, model, batch_iter, epoch, verbose=True, is_training=True, mode='normal'): # vs mode = elmo
     start_time = time.time()
     acc_count = 0
     step = 0 #len(all_data)
@@ -88,11 +94,19 @@ def run_epoch(session, model, batch_iter, epoch, verbose=True, is_training=True)
         batch = (x for x in zip(*batch))
         # because the batch contains the sentences, e1, e2 etc all as separate lists, zip(*) makes it
         # such that every line of the new tuple contains the first element of sentences, e1, e2 etc
-        sents, relations, e1, e2, dist1, dist2 = batch
+        if mode == 'elmo': sents, relations, e1, e2, dist1, dist2, elmo_embeddings = batch
+        else: sents, relations, e1, e2, dist1, dist2 = batch
+
         sents = np.vstack(sents)
-        in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch = model.inputs
-        feed_dict = {in_x: sents, in_e1: e1, in_e2: e2, in_dist1: dist1, in_dist2: dist2, \
-                in_y: relations, in_epoch: epoch}
+        if mode == 'elmo': 
+            in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_elmo = model.inputs
+            feed_dict = {in_x: sents, in_e1: e1, in_e2: e2, in_dist1: dist1, in_dist2: dist2, 
+                    in_y: relations, in_epoch: epoch, in_elmo: elmo_embeddings}
+        else:
+            in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch = model.inputs
+            feed_dict = {in_x: sents, in_e1: e1, in_e2: e2, in_dist1: dist1, in_dist2: dist2, 
+                    in_y: relations, in_epoch: epoch}
+
         if is_training:
             _, scores, loss, summary = session.run(
                 [model.train_op, model.scores, model.loss, model.merged_summary],
@@ -164,8 +178,10 @@ def init():
         logging.info('Error: Fold is not None but cross validate is True')
         return
     else:
-        train_data = dataset.get_data_for_fold(config.fold)
-        dev_data = dataset.get_data_for_fold(config.fold, DEV)
+        if config.use_elmo is True: mode = 'elmo'
+        else: mode = 'normal'
+        train_data = dataset.get_data_for_fold(config.fold, mode=mode)
+        dev_data = dataset.get_data_for_fold(config.fold, DEV, mode=mode)
 
     # now each of the above data contains the following in order:
     # sentences, relations, e1_pos, e2_pos
@@ -188,6 +204,14 @@ def init():
         # split data
         train_data = main_utils.preprocess_data_noncrossvalidated(train_data, config.border_size)
         dev_data = main_utils.preprocess_data_noncrossvalidated(dev_data, config.border_size)
+        if config.use_test is True and config.use_elmo is True:
+            train_elmo = data_utils.get_elmo_embeddings(res('elmo/train-elmo-full.hdf5'))
+            test_elmo = data_utils.get_elmo_embeddings(res('elmo/test-elmo-full.hdf5'))
+            train_data = train_data + train_elmo
+            dev_data = dev_data + test_elmo # in this case this is actually the test data
+        elif config.use_test is False and config.use_elmo is True:
+            raise NotImplementedError('Cannot use elmo embeddings with a randomly sampled dev set')
+
         if config.use_test is False and config.early_stop is True:
             early_stop_data = main_utils.preprocess_data_noncrossvalidated(early_stop_data, config.border_size)
         elif config.use_test is True and config.early_stop is True:
@@ -218,8 +242,9 @@ def init():
     print("early stop is", config.early_stop)
     print("lr_values and boundaries are", config.lr_values, config.lr_boundaries)
     print("seed for random initialization is ",  config.seed)
-
-    # Build vocab, pretend that your test set does not exist because when you need to use test 
+    print('use_test is', config.use_test)
+    print('use_elmo is', config.use_elmo)
+    # Build vocab, pretend that your test set does not exist because when you need to use test
     # set, you can just make sure that what we report on (i.e. dev set here) is actually the test data
     all_data = train_data[0] + dev_data[0]
     if config.early_stop is False:
@@ -349,11 +374,17 @@ def main():
                         if config.early_stop is True:
                             early_stop_iter = data_utils.batch_iter(config.seed, main_utils.stack_data(early_stop_vec), bz, shuffle=False)
                         train_verbosity = False if config.cross_validate is False else True
-                        train_acc, _ = run_epoch(session, m_train, train_iter, epoch, verbose=False)
+                        
+                        if config.use_elmo is True: mode = 'elmo'
+                        else: mode = 'normal'
+                        
+                        train_acc, _ = run_epoch(
+                                session, m_train, train_iter, epoch, verbose=False, mode = mode
+                        )
 
                         # TODO(geeticka): Why separate model (e.g. why m_eval vs. m_train)?
                         dev_acc, dev_preds = run_epoch(
-                            session, m_eval, dev_iter, epoch, verbose=False, is_training=False
+                            session, m_eval, dev_iter, epoch, verbose=False, is_training=False, mode = mode
                         )
 
                         config.result_filepath = os.path.join(config.output_folder, config.result_file)
