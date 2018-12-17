@@ -123,6 +123,8 @@ parser.add_argument('--add_hyperparam_details', default=None, type=str, \
                                                 + 'hyperparameter details')
 parser.add_argument('--train_start_folds', default=[], type=list, \
                                                 help='start times of each of the models by fold')
+parser.add_argument('--execution_time_folds', default=[], type=list, \
+                                                help='execution times of each of the models by fold')
 
 #config = parser.parse_args()
 #TODO (geeticka): will need to have another parameter for the hyperparameter tuning case so that you can dump the csv for hyperparam tuning as a separate csv

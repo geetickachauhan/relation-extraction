@@ -474,6 +474,7 @@ if __name__ == '__main__':
         config.id = str(uuid.uuid4())
         date = main_utils.get_current_date() # this is to get the date when the experiment was started,
         date_of_experiment_start = date
+        start_time = time.time()
         # not necessarily when the training started
 
         # see https://stackoverflow.com/questions/34344836/will-hashtime-time-always-be-unique
@@ -484,8 +485,13 @@ if __name__ == '__main__':
         if config.cross_validate is True:
             num_folds = 10 # this value will need to be changed depending on the dataset
             for config.fold in range(0, num_folds):
+                start_time = time.time()
                 print('Fold {} Starting!'.format(config.fold))
                 main()
+                end_time = time.time()
+                execution_time = (end_time - start_time)/3600.0 #in hours
+                config.execution_time_folds.append(execution_time)
+
             mean_macro_f1 = np.mean(config.macro_f1_folds)
             std_macro_f1 = np.std(config.macro_f1_folds)
             print("All macro F1 scores", config.macro_f1_folds)
@@ -505,7 +511,6 @@ if __name__ == '__main__':
             main_utils.create_folder_if_not_exists(config.final_result_folder)
             final_result_path = os.path.join(config.final_result_folder, 'final_result.csv')
             # need to change the format in which this is written
-
             # 1 column for fold #, dictionary with all the hyperparam details, and the last column for the result of the fold.
             if(os.path.exists(final_result_path)):
                 result_dataframe = pd.read_csv(final_result_path)
@@ -516,7 +521,7 @@ if __name__ == '__main__':
                 result_dataframe = pd.DataFrame(
                     columns = [
                         'Fold Number', 'Parameters', 'Macro F1', 'Train Start Time', 'Hyperparam Tuning Mode',
-                        'ID', 'Date of Starting Command'
+                        'ID', 'Date of Starting Command', 'Execution Time (hr)'
                     ], # will need to handle date of starting command differently for hyperparam tuning
                 )
             start_index = len(result_dataframe.index)
@@ -526,7 +531,8 @@ if __name__ == '__main__':
             for i in range(start_index, start_index + num_folds):
                 result_dataframe.loc[i] = [
                     curr_fold, str(parms_to_add_to_df), config.macro_f1_folds[curr_fold],
-                    config.train_start_folds[curr_fold], config.hyperparam_tuning_mode, config.id, date
+                    config.train_start_folds[curr_fold], config.hyperparam_tuning_mode, config.id, date,
+                    config.execution_time_folds[curr_fold]
                 ]
                 curr_fold += 0
             result_dataframe.to_csv(final_result_path, index=False)
@@ -535,3 +541,6 @@ if __name__ == '__main__':
             ensemble_num = 1
             for ii in range(ensemble_num):
                     main()
+            end_time = time.time()
+            execution_time = (end_time - start_time)/3600.0
+            print("Execution time (in hr): ", execution_time)
