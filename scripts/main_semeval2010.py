@@ -503,7 +503,7 @@ if __name__ == '__main__':
                     config.train_start_folds[curr_fold], config.hyperparam_tuning_mode, config.id, date,
                     config.execution_time_folds[curr_fold]
                 ]
-                curr_fold += 0
+                curr_fold += 1
             result_dataframe.to_csv(final_result_path, index=False)
 
         else:
