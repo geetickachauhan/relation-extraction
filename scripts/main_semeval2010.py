@@ -58,6 +58,8 @@ data_utils.Dataset(res(prefix+'pickled-files/seed_{K}_10{middle}-fold-border_{N}
 print("border size:", prefix+'pickled-files/seed_{K}_10{middle}-fold-border_{N}.pkl'.format(K=config.pickle_seed,
     N=config.border_size, middle=middle))
 
+date_of_experiment_start = None
+
 # performs the prediction, but makes sure that if all the scores are negative, predict the class "Other"
 def prediction(scores):
     data_size = scores.shape[0]
@@ -299,7 +301,7 @@ def output_model(config):
     #    model_name = 'cnn_{0}'.format(config.id + '_' + train_start_time_in_miliseconds +'-'+ 'Fold-'+
     #        str(config.fold) + hyperparam_dir_addition)
     #else:
-    model_name = 'cnn_{0}'.format(config.id + '_' + train_start_time_in_miliseconds+ hyperparam_dir_addition)
+    model_name = 'cnn_{0}'.format(config.id + '_' + date_of_experiment_start + hyperparam_dir_addition)
     
     config.parameters = parameters
     if config.fold is not None and config.cross_validate is True:
@@ -471,6 +473,7 @@ if __name__ == '__main__':
         main_utils.create_folder_if_not_exists(config.output_dir)
         config.id = str(uuid.uuid4())
         date = main_utils.get_current_date() # this is to get the date when the experiment was started,
+        date_of_experiment_start = date
         # not necessarily when the training started
 
         # see https://stackoverflow.com/questions/34344836/will-hashtime-time-always-be-unique
