@@ -17,12 +17,15 @@ class Model(object):
         # Inputs
         # Sentences
         in_x     = tf.placeholder(dtype=tf.int32, shape=[None, n],                          name='in_x')
-        # Positions
+        # Relative Positions of words in sentence with respect to each entity
         in_dist1 = tf.placeholder(dtype=tf.int32, shape=[None, n],                          name='in_dist1')
         in_dist2 = tf.placeholder(dtype=tf.int32, shape=[None, n],                          name='in_dist2')
         # Entities
         in_e1    = tf.placeholder(dtype=tf.int32, shape=[None, config.max_e1_len],          name='in_e1')
         in_e2    = tf.placeholder(dtype=tf.int32, shape=[None, config.max_e2_len],          name='in_e2')
+        # Positions of the entities (for piecewise splitting of the sentence)
+        in_pos1  = tf.placeholder(dtype=tf.int32, shape=[None],                             name='in_pos1')
+        in_pos2  = tf.placeholder(dtype=tf.int32, shape=[None],                             name='in_pos2')
 
         # Labels
         in_y     = tf.placeholder(dtype=tf.int32, shape=[None],                              name='in_y')
@@ -36,9 +39,9 @@ class Model(object):
             in_elmo = tf.placeholder(dtype=tf.float32, shape=[None, elmo_layers, n, elmo_es],     name='in_elmo')
 
         if config.use_elmo is True:
-            self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_elmo)
+            self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_elmo, in_pos1, in_pos2)
         else:
-            self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch)
+            self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_pos1, in_pos2)
         # TODO(geeticka): Don't comment out, control with a switch. config.verbosity_level.
         #print("Embeddings shape", embed.shape)
         #print("in_dep shape", in_dep.shape)
