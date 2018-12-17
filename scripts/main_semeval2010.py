@@ -103,7 +103,7 @@ def run_epoch(session, model, batch_iter, epoch, verbose=True, is_training=True,
             feed_dict = {in_x: sents, in_e1: e1, in_e2: e2, in_dist1: dist1, in_dist2: dist2, 
                     in_y: relations, in_epoch: epoch, in_elmo: elmo_embeddings}
         else:
-            in_x, in_e1, in_e2, in_dist1, in_dist2, in_epoch = model.inputs
+            in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch = model.inputs
             feed_dict = {in_x: sents, in_e1: e1, in_e2: e2, in_dist1: dist1, in_dist2: dist2, 
                     in_y: relations, in_epoch: epoch}
 
