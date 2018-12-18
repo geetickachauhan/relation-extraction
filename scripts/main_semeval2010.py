@@ -483,7 +483,7 @@ if __name__ == '__main__':
         # see https://stackoverflow.com/questions/34344836/will-hashtime-time-always-be-unique
 
         print("Cross validate is ", config.cross_validate)
-
+        print("Piecewise Max pooling is ", config.use_piecewise_pool)
 
         if config.cross_validate is True:
             num_folds = 10 # this value will need to be changed depending on the dataset

@@ -563,11 +563,13 @@ def vectorize(config, data, word_dict):
                     e2_vec[idx, ii] = vec[pos2[-1]]
 
     dist1, dist2, num_pos = relative_distance(num_data, max_sen_len, e1_pos, e2_pos)
-
+    
+    position1 = list(map(lambda x: x[1], e1_pos))
+    position2 = list(map(lambda x: x[1], e2_pos))
     if config.use_elmo is True: 
         return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2, \
-    padded_elmo_embeddings, e1_pos[1], e2_pos[1]
-    return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2, e1_pos[1], e2_pos[1]
+    padded_elmo_embeddings, position1, position2
+    return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2, position1, position2
     # we are also returning the ending positions of the entity 1 and entity 2
 
 def pos(x):
