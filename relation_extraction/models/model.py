@@ -298,8 +298,8 @@ class Model(object):
                     [0, p1_ind, p2_ind, bwc_conv, dc, sliced])
 
         # concat is needed below to convert all individual tensors into one tensor
-        sliced = tf.squeeze(sliced.concat()) # slices, batch_size, max_sen_len, channels_count
-        
+        sliced = tf.squeeze(sliced.concat()) # batch_size, slices, max_sen_len, channels_count
+        sliced = tf.reshape(sliced, [variable_batch_size, num_pieces, max_sen_len, dc])
         bwgc_mpool = tf.nn.max_pool(sliced,
                 ksize=[1, 1, max_sen_len, 1],
                 strides=[1, 1, max_sen_len, 1],
