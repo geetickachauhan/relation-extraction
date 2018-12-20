@@ -241,9 +241,9 @@ class Model(object):
         width = tf.Variable(bwc_conv.shape[1], dtype=tf.int32) # total width (i.e. max sentence length)
 
         b_slice_from = [i, 0, 0]
-        b_slice_size = tf.concat([[1], l_ind, [channels_count]], 0)
-        m_slice_from = tf.concat([[i], l_ind, [0]], 0)
-        m_slice_size = tf.concat([[1], r_ind - l_ind, [channels_count]], 0)
+        b_slice_size = tf.concat([[1], l_ind + 1, [channels_count]], 0)
+        m_slice_from = tf.concat([[i], l_ind + 1, [0]], 0)
+        m_slice_size = tf.concat([[1], r_ind - l_ind - 1, [channels_count]], 0)
         a_slice_from = tf.concat([[i], r_ind, [0]], 0)
         a_slice_size = tf.concat([[1], width - r_ind, [channels_count]], 0)
 
@@ -253,12 +253,12 @@ class Model(object):
        
 
         pad_b = tf.concat([[[0,0]],
-                            tf.reshape(tf.concat([width - l_ind, [0]], 0), shape=[1,2]),
+                            tf.reshape(tf.concat([width - l_ind - 1, [0]], 0), shape=[1,2]),
                             [[0,0]]],
                             axis=0)
         
         pad_m = tf.concat([[[0,0]],
-                            tf.reshape(tf.concat([width - r_ind + l_ind, [0]], 0), shape=[1,2]),
+                            tf.reshape(tf.concat([width - r_ind + l_ind + 1, [0]], 0), shape=[1,2]),
                             [[0,0]]],
                             axis=0)
 
