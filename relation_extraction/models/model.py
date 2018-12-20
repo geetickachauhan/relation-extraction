@@ -26,7 +26,9 @@ class Model(object):
         # Positions of the entities (for piecewise splitting of the sentence)
         in_pos1  = tf.placeholder(dtype=tf.int32, shape=[None],                             name='in_pos1')
         in_pos2  = tf.placeholder(dtype=tf.int32, shape=[None],                             name='in_pos2')
-
+        in_pos3  = tf.placeholder(dtype=tf.int32, shape=[None],                             name='in_pos3')
+        in_pos4  = tf.placeholder(dtype=tf.int32, shape=[None],                             name='in_pos4')
+        
         # Labels
         in_y     = tf.placeholder(dtype=tf.int32, shape=[None],                              name='in_y')
         # epoch
@@ -39,9 +41,11 @@ class Model(object):
             in_elmo = tf.placeholder(dtype=tf.float32, shape=[None, elmo_layers, n, elmo_es],     name='in_elmo')
 
         if config.use_elmo is True:
-            self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_elmo, in_pos1, in_pos2)
+            self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_elmo, in_pos1, in_pos2,
+                    in_pos3, in_pos4)
         else:
-            self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_pos1, in_pos2)
+            self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_pos1, in_pos2,
+                    in_pos3, in_pos4)
         # TODO(geeticka): Don't comment out, control with a switch. config.verbosity_level.
         #print("Embeddings shape", embed.shape)
         #print("in_dep shape", in_dep.shape)
@@ -71,9 +75,9 @@ class Model(object):
             print("elmo weighted sum", elmo_weighted_sum.shape)
             tf.summary.histogram("elmo_weighted_sum", elmo_weighted_sum)
 
-        #tf.summary.histogram("word_embedding_matrix", embed)
-        #tf.summary.histogram("position1_embedding_matrix", pos1_embed)
-        #tf.summary.histogram("position2_embedding_matrix", pos2_embed)
+        tf.summary.histogram("word_embedding_matrix", embed)
+        tf.summary.histogram("position1_embedding_matrix", pos1_embed)
+        tf.summary.histogram("position2_embedding_matrix", pos2_embed)
 
 
         # embdding lookup
@@ -98,7 +102,8 @@ class Model(object):
 
         mode_pool = 'simple_max_pool' if config.use_piecewise_pool is False else 'piecewise_max_pool'
         h_pool_flat, filter_sizes, num_pieces = self.simple_convolution(n, d, list_to_concatenate, config.filter_sizes,
-                dc, keep_prob, is_training, '', initializer, regularizer, in_pos1, in_pos2, mode_pool)
+                dc, keep_prob, is_training, '', initializer, regularizer, in_pos1, in_pos2, in_pos3,
+                in_pos4, mode_pool)
 
         #TODO: create another convolution and concatenate that pooled output with h_pool_flat after flattening
         # that too
@@ -230,59 +235,85 @@ class Model(object):
 
     # based on
     # https://github.com/nicolay-r/sentiment-pcnn/blob/7dc58bf34eab609aebe258dc1157010653994920/networks/pcnn/pcnn_core.py
-    def piecewise_splitting(self, i, p1_ind, p2_ind, bwc_conv, channels_count, outputs):
+    def piecewise_splitting(self, i, p1_ind, p2_ind, p3_ind, p4_ind, bwc_conv, channels_count, outputs):
 
         '''
-        Split the tensor into 3 pieces according to the position of the entities in the sentence
+        Split the tensor into 5 pieces according to the position of the entities in the sentence
         '''
-        l_ind = tf.minimum(tf.gather(p1_ind, [i]), tf.gather(p2_ind, [i])) #left
-        r_ind = tf.maximum(tf.gather(p1_ind, [i]), tf.gather(p2_ind, [i])) #right
-
+        ind1 = tf.gather(p1_ind, [i])
+        ind2 = tf.gather(p2_ind, [i])
+        ind3 = tf.gather(p3_ind, [i])
+        ind4 = tf.gather(p4_ind, [i])
+        indices = tf.concat([ind1, ind2, ind3, ind4], -1)
+        sorted_ind = tf.contrib.framework.sort(indice, direction='ASCENDING')
+        l_ind, m1_ind, m2_ind, r_ind = tf.split(sorted_ind, [1,1,1,1], 0)
+        #val = tf.nn.top_k(indices, k=4, sorted=True) # top k sorted in descending
+        #print(len(val))
+        #r_ind, m2_ind, m1_ind, l_ind = val
         width = tf.Variable(bwc_conv.shape[1], dtype=tf.int32) # total width (i.e. max sentence length)
 
-        b_slice_from = [i, 0, 0]
-        b_slice_size = tf.concat([[1], l_ind + 1, [channels_count]], 0)
-        m_slice_from = tf.concat([[i], l_ind + 1, [0]], 0)
-        m_slice_size = tf.concat([[1], r_ind - l_ind - 1, [channels_count]], 0)
-        a_slice_from = tf.concat([[i], r_ind, [0]], 0)
-        a_slice_size = tf.concat([[1], width - r_ind, [channels_count]], 0)
+        piece1_slice_from = [i, 0, 0]
+        piece1_slice_size = tf.concat([[1], l_ind, [channels_count]], 0)
+        piece2_slice_from = tf.concat([[i], l_ind, [0]], 0)
+        piece2_slice_size = tf.concat([[1], m1_ind - l_ind + 1, [channels_count]], 0) # entity 1
+        piece3_slice_from = tf.concat([[i], m1_ind + 1, [0]], 0)
+        piece3_slice_size = tf.concat([[1], m2_ind - m1_ind - 1, [channels_count]], 0) # words in between
+        piece4_slice_from = tf.concat([[i], m2_ind, [0]], 0) 
+        piece4_slice_size = tf.concat([[1], r_ind - m2_ind + 1, [channels_count]], 0) # entity 2
+        piece5_slice_from = tf.concat([[i], r_ind + 1, [0]], 0) # it's possible that this index doesn't exist
+        piece5_slice_size = tf.concat([[1], width - r_ind - 1, [0]], 0) 
 
-        bwc_split_b = tf.slice(bwc_conv, b_slice_from, b_slice_size)
-        bwc_split_m = tf.slice(bwc_conv, m_slice_from, m_slice_size)
-        bwc_split_a = tf.slice(bwc_conv, a_slice_from, a_slice_size)
+        bwc_split_piece1 = tf.slice(bwc_conv, piece1_slice_from, piece1_slice_size)
+        bwc_split_piece2 = tf.slice(bwc_conv, piece2_slice_from, piece2_slice_size)
+        bwc_split_piece3 = tf.slice(bwc_conv, piece3_slice_from, piece3_slice_size)
+        bwc_split_piece4 = tf.slice(bwc_conv, piece4_slice_from, piece4_slice_size)
+        bwc_split_piece5 = tf.slice(bwc_conv, piece5_slice_from, piece5_slice_size)
        
 
-        pad_b = tf.concat([[[0,0]],
-                            tf.reshape(tf.concat([width - l_ind - 1, [0]], 0), shape=[1,2]),
+        pad_piece1 = tf.concat([[[0,0]],
+                            tf.reshape(tf.concat([width - l_ind, [0]], 0), shape=[1,2]),
                             [[0,0]]],
                             axis=0)
         
-        pad_m = tf.concat([[[0,0]],
-                            tf.reshape(tf.concat([width - r_ind + l_ind + 1, [0]], 0), shape=[1,2]),
+        pad_piece2 = tf.concat([[[0,0]],
+                            tf.reshape(tf.concat([width - m1_ind + l_ind - 1, [0]], 0), shape=[1,2]),
                             [[0,0]]],
                             axis=0)
 
-        pad_a = tf.concat([[[0,0]],
-                            tf.reshape(tf.concat([r_ind, [0]], 0), shape=[1,2]),
+        pad_piece3 = tf.concat([[[0,0]],
+                            tf.reshape(tf.concat([width - m2_ind + m1_ind + 1, [0]], 0), shape=[1,2]),
                             [[0,0]]],
                             axis=0)
 
-        bwc_split_b = tf.pad(bwc_split_b, pad_b, constant_values=tf.float32.min)
-        bwc_split_m = tf.pad(bwc_split_m, pad_m, constant_values=tf.float32.min)
-        bwc_split_a = tf.pad(bwc_split_a, pad_a, constant_values=tf.float32.min)
+        pad_piece4 = tf.concat([[[0,0]],
+                            tf.reshape(tf.concat([width - r_ind + m2_ind - 1, [0]], 0), shape=[1,2]),
+                            [[0,0]]],
+                            axis=0)
+        
+        pad_piece5 = tf.concat([[[0,0]],
+                            tf.reshape(tf.concat([r_ind + 1, [0]], 0), shape=[1,2]),
+                            [[0,0]]],
+                            axis=0)
+        
+        bwc_split_piece1 = tf.pad(bwc_split_piece1, pad_piece1, constant_values=tf.float32.min)
+        bwc_split_piece2 = tf.pad(bwc_split_piece2, pad_piece2, constant_values=tf.float32.min)
+        bwc_split_piece3 = tf.pad(bwc_split_piece3, pad_piece3, constant_values=tf.float32.min)
+        bwc_split_piece4 = tf.pad(bwc_split_piece4, pad_piece4, constant_values=tf.float32.min)
+        bwc_split_piece5 = tf.pad(bwc_split_piece5, pad_piece5, constant_values=tf.float32.min)
 
-        outputs = outputs.write(i, [[bwc_split_b, bwc_split_m, bwc_split_a]])
+        outputs = outputs.write(i, [[bwc_split_piece1, bwc_split_piece2, bwc_split_piece3,\
+                bwc_split_piece4, bwc_split_piece5]])
 
         i += 1
-        return i, p1_ind, p2_ind, bwc_conv, channels_count, outputs
+        return i, p1_ind, p2_ind, p3_ind, p4_ind, bwc_conv, channels_count, outputs
 
-    def piecewise_max_pooling(self, h, p1_ind, p2_ind):
+    def piecewise_max_pooling(self, h, p1_ind, p2_ind, p3_ind, p4_ind):
         '''
         Given the output of the tanh function, in the shape batch_size, max_sen_len, 1, channels_count
         and the location of the ending index of the 2 entities, perform the splitting and
         return a piecewise max pooled operation
         '''
-        num_pieces = 3
+        num_pieces = 5
         dc = int(h.shape[-1])
         max_sen_len = int(h.shape[1])
         bwc_conv = tf.squeeze(h)
@@ -295,7 +326,7 @@ class Model(object):
         _, _, _, _, _, sliced = tf.while_loop(
                     lambda i, *_: tf.less(i, variable_batch_size),
                     self.piecewise_splitting,
-                    [0, p1_ind, p2_ind, bwc_conv, dc, sliced])
+                    [0, p1_ind, p2_ind, p3_ind, p4_ind, bwc_conv, dc, sliced])
 
         # concat is needed below to convert all individual tensors into one tensor
         sliced = tf.squeeze(sliced.concat()) # batch_size, slices, max_sen_len, channels_count
@@ -329,7 +360,7 @@ class Model(object):
     
     def simple_convolution(self, max_sen_len, dim, list_to_concatenate, filter_sizes,
             channels_count, keep_prob, is_training, prefix, initializer, regularizer,
-            p1_ind, p2_ind, mode='simple_max_pool'):
+            p1_ind, p2_ind, p3_ind, p4_ind, mode='simple_max_pool'):
         # x: (batch_size, max_sen_len, embdding_size, 1)
         # w: (filter_size, embedding_size, 1, num_filters)
 
@@ -362,7 +393,7 @@ class Model(object):
             if mode == 'simple_max_pool':
                 bc_pmpool, num_pieces = self.simple_max_pooling(h)
             else:
-                bc_pmpool, num_pieces = self.piecewise_max_pooling(h, p1_ind, p2_ind)
+                bc_pmpool, num_pieces = self.piecewise_max_pooling(h, p1_ind, p2_ind, p3_ind, p4_ind)
             pooled_outputs.append(bc_pmpool)
         h_pool_flat = tf.concat(pooled_outputs, -1) # concatenate over the last dimension which is channels
         #print("h_pool_flat", h_pool_flat.shape)
