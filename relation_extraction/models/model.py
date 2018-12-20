@@ -71,9 +71,9 @@ class Model(object):
             print("elmo weighted sum", elmo_weighted_sum.shape)
             tf.summary.histogram("elmo_weighted_sum", elmo_weighted_sum)
 
-        tf.summary.histogram("word_embedding_matrix", embed)
-        tf.summary.histogram("position1_embedding_matrix", pos1_embed)
-        tf.summary.histogram("position2_embedding_matrix", pos2_embed)
+        #tf.summary.histogram("word_embedding_matrix", embed)
+        #tf.summary.histogram("position1_embedding_matrix", pos1_embed)
+        #tf.summary.histogram("position2_embedding_matrix", pos2_embed)
 
 
         # embdding lookup
@@ -241,11 +241,11 @@ class Model(object):
         width = tf.Variable(bwc_conv.shape[1], dtype=tf.int32) # total width (i.e. max sentence length)
 
         b_slice_from = [i, 0, 0]
-        b_slice_size = tf.concat([[1], l_ind + 1, [channels_count]], 0)
-        m_slice_from = tf.concat([[i], l_ind + 1, [0]], 0)
+        b_slice_size = tf.concat([[1], l_ind, [channels_count]], 0)
+        m_slice_from = tf.concat([[i], l_ind, [0]], 0)
         m_slice_size = tf.concat([[1], r_ind - l_ind, [channels_count]], 0)
-        a_slice_from = tf.concat([[i], r_ind + 1, [0]], 0)
-        a_slice_size = tf.concat([[1], width - r_ind - 1, [channels_count]], 0)
+        a_slice_from = tf.concat([[i], r_ind, [0]], 0)
+        a_slice_size = tf.concat([[1], width - r_ind, [channels_count]], 0)
 
         bwc_split_b = tf.slice(bwc_conv, b_slice_from, b_slice_size)
         bwc_split_m = tf.slice(bwc_conv, m_slice_from, m_slice_size)
@@ -253,7 +253,7 @@ class Model(object):
        
 
         pad_b = tf.concat([[[0,0]],
-                            tf.reshape(tf.concat([width - l_ind - 1, [0]], 0), shape=[1,2]),
+                            tf.reshape(tf.concat([width - l_ind, [0]], 0), shape=[1,2]),
                             [[0,0]]],
                             axis=0)
         
@@ -263,7 +263,7 @@ class Model(object):
                             axis=0)
 
         pad_a = tf.concat([[[0,0]],
-                            tf.reshape(tf.concat([r_ind + 1, [0]], 0), shape=[1,2]),
+                            tf.reshape(tf.concat([r_ind, [0]], 0), shape=[1,2]),
                             [[0,0]]],
                             axis=0)
 
