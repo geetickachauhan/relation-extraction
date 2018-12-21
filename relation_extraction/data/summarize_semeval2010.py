@@ -92,7 +92,7 @@ def get_confusion_matrix_as_df(confusion_matrix_official, relations_as_short_lis
     return confusion_matrix_df
 
 # Give the confusions acorss each relation, with a special interest on other
-def generate_confused_with_string(index, row, relation_full_form_dictionary):
+def generate_confused_with_string(index, row, relation_full_form_dictionary, full_form=False):
     # index is the current relation that we are considering and row is all the predicted examples
     confused_with_string = ""
     num_of_columns = len(row.index)
@@ -100,24 +100,27 @@ def generate_confused_with_string(index, row, relation_full_form_dictionary):
         column_name = row.index[i]
         column_value = int(row.loc[column_name])
         if column_value > 0 and column_name != index:
-            confused_with_string += " " + relation_full_form_dictionary[column_name] + \
-            "(" + str(column_value) + ")"
+            if full_form is True: column_name = relation_full_form_dictionary[column_name]
+            confused_with_string += " " + column_name + "(" + str(column_value) + ")"
     return confused_with_string.strip()
     #print(row.data[0])
     #for val in row:
     #    print(val)
 
-def generate_pretty_summary_confusion_matrix(confusion_matrix_df, relation_full_form_dictionary):
+def generate_pretty_summary_confusion_matrix(confusion_matrix_df, relation_full_form_dictionary,
+        full_form=False):
     data = [] # index will be 0,1,2 and so on, but columns will be
     # Actual label, confused with as a string, correct predictions as a number
     for index, row in confusion_matrix_df.iterrows():
         actual_label = relation_full_form_dictionary[index]
-        confused_with = generate_confused_with_string(index, row, relation_full_form_dictionary)
+        confused_with = generate_confused_with_string(index, row, relation_full_form_dictionary, full_form) 
+        # short form is the default
         correct_predictions = row[index] # eg: gives the column value for C-E for an index C-E
         if index != '_O': confused_with_other = row['_O'] # this is specific to semeval and will need to be changed
         else: confused_with_other = None
         data.append([actual_label, confused_with, confused_with_other, correct_predictions])
-    columns = pd.Index(['Gold Relation', 'Confused With(num_examples)', 'Confused with Other', 'Correct Predictions'], name='summary')
+    columns = pd.Index(['Gold Relation', 'Confused With(num_examples)',
+        'Confused with Other', 'Correct Predictions'], name='summary')
     pretty_summary_confusion_matrix_df = pd.DataFrame(data=data, columns=columns)
     return pretty_summary_confusion_matrix_df
 
@@ -138,7 +141,8 @@ def create_metrics_macro_micro_df(metrics_macro, metrics_micro):
     return metrics_macro_micro
 
 # Finally, create a large summary function
-def create_summary(result_file_location, relation_full_form_dictionary, relation_as_short_list):
+def create_summary(result_file_location, relation_full_form_dictionary, relation_as_short_list,
+        full_form=False):
     if not os.path.exists(result_file_location):
         print("Check your path first!")
         return None
@@ -150,8 +154,9 @@ def create_summary(result_file_location, relation_full_form_dictionary, relation
     confusion_matrix_df = get_confusion_matrix_as_df(confusion_matrix_official, relation_as_short_list)
     
     # these are the summary information that will need to be returned
-    pretty_summary_confusion_matrix_df = generate_pretty_summary_confusion_matrix(confusion_matrix_df, 
-                                                                                  relation_full_form_dictionary)
+    pretty_summary_confusion_matrix_df = \
+            generate_pretty_summary_confusion_matrix(confusion_matrix_df, relation_full_form_dictionary,
+                    full_form)
     total_correct_predictions = pretty_summary_confusion_matrix_df['Correct Predictions'].sum()
     metrics_indiv_relations_df = create_metrics_indiv_relations_df(metrics_indiv_relations, 
                                                                    relation_full_form_dictionary, 
@@ -168,19 +173,28 @@ def get_sum_confusion_matrix(confusion_matrix):
         sum += confusion_matrix[column].sum()
     return sum
 
+
 # for each of the relations, do a t test between the two model metrics
-def indiv_metric_comparison(metrics_i_model1, metrics_i_model2, model1_name, model2_name):
-    print("TTest from %s to %s"%(model1_name, model2_name))
-    print("Below is the metric comparsion across the two models" + \
-          "considering individual relations, excluding 'Other'")
+def indiv_metric_comparison(metrics_i_model1, metrics_i_model2, model1_name, model2_name, exclude_other=True):
+    print("\nTTest from %s to %s"%(model1_name, model2_name))
+    if exclude_other is True:
+        print("Below is the metric comparsion across the two models" + \
+              " considering individual relations, excluding 'Other'")
+    else:
+        print("Below is the metric comparsion across the two models" + \
+              " considering individual relations, including 'Other'")
     for column in metrics_i_model1:
-        metric_model1 = metrics_i_model1[column].tolist()[:-1] # excluding "Other"
-        metric_model2 = metrics_i_model2[column].tolist()[:-1]
+        metric_model1 = metrics_i_model1[column].tolist()
+        metric_model2 = metrics_i_model2[column].tolist()
+        if exclude_other is True:
+            metric_model1 = metric_model1[:-1] # excluding 'Other'
+            metric_model2 = metric_model2[:-1]
         tt = ttest_rel(metric_model1, metric_model2)
         print("Metric: %s \t statistic %.2f \t p_value %s"%
               (column, tt.statistic, tt.pvalue))
 
 def get_macro_micro_metric_comparison(metrics_ma_mi_model1, metrics_ma_mi_model2, model1_name, model2_name):
+    print("\nAll the macro and micro metrics are calculated, excluding the 'Other' class")
     print("Macro - Micro for the %s model"%(model1_name))
     for column in metrics_ma_mi_model1:
         macro = metrics_ma_mi_model1[column].loc['macro']
@@ -209,21 +223,31 @@ def get_accuracy_difference(accuracy_model1, accuracy_model2, model1_name, model
     print("Accuracy_%s - Accuracy_%s %.2f"%(model1_name, model2_name, accuracy_model1 - accuracy_model2))
 
 # This is the final function to call
+# when exclude_other is 0, we print indiv relation metrics without the other class
+# when it is 1, we print it with the other class only
+# when it is 2, we print both with and without other class
 def print_full_summary(model1_loc, model2_loc, model1_name, model2_name, res,
-        relation_full_form_dictionary, relation_as_short_list):
+        relation_full_form_dictionary, relation_as_short_list, exclude_other=0, full_form=False):
     model1 = res(model1_loc)
     model2 = res(model2_loc)
     
     cm_model1, summary_cm_model1, correct_pred_model1, metrics_i_model1, \
     metrics_ma_mi_model1, accuracy_model1 \
-    = create_summary(model1, relation_full_form_dictionary, relation_as_short_list)
+    = create_summary(model1, relation_full_form_dictionary, relation_as_short_list, full_form)
     
     cm_model2, summary_cm_model2, correct_pred_model2, metrics_i_model2, \
     metrics_ma_mi_model2, accuracy_model2 \
-    = create_summary(model2, relation_full_form_dictionary, relation_as_short_list)
+    = create_summary(model2, relation_full_form_dictionary, relation_as_short_list, full_form)
     
     # T Test of each metrics, across the relations not Other
-    indiv_metric_comparison(metrics_i_model1, metrics_i_model2, model1_name, model2_name)
+    if exclude_other == 1:
+        indiv_metric_comparison(metrics_i_model1, metrics_i_model2, model1_name, model2_name, 
+                exclude_other=False)
+    else:
+        indiv_metric_comparison(metrics_i_model1, metrics_i_model2, model1_name, model2_name)
+        if exclude_other == 2:
+            indiv_metric_comparison(metrics_i_model1, metrics_i_model2, model1_name, model2_name,
+                    exclude_other=False)
     
     # Get the difference in the macro and micro scores
     get_macro_micro_metric_comparison(metrics_ma_mi_model1, metrics_ma_mi_model2, model1_name, model2_name)
