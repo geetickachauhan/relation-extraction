@@ -94,18 +94,21 @@ def run_epoch(session, model, batch_iter, epoch, verbose=True, is_training=True,
         batch = (x for x in zip(*batch))
         # because the batch contains the sentences, e1, e2 etc all as separate lists, zip(*) makes it
         # such that every line of the new tuple contains the first element of sentences, e1, e2 etc
-        if mode == 'elmo': sents, relations, e1, e2, dist1, dist2, elmo_embeddings = batch
-        else: sents, relations, e1, e2, dist1, dist2 = batch
+        if mode == 'elmo': sents, relations, e1, e2, dist1, dist2, elmo_embeddings, position1, position2 = batch
+        else: sents, relations, e1, e2, dist1, dist2, position1, position2 = batch
+        # position 1 and position 2 refer to the positions at which to split the sentence into 
+        # multiple pieces
 
         sents = np.vstack(sents)
         if mode == 'elmo': 
-            in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_elmo = model.inputs
+            in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_elmo, in_pos1, in_pos2 = model.inputs
             feed_dict = {in_x: sents, in_e1: e1, in_e2: e2, in_dist1: dist1, in_dist2: dist2, 
-                    in_y: relations, in_epoch: epoch, in_elmo: elmo_embeddings}
+                    in_y: relations, in_epoch: epoch, in_elmo: elmo_embeddings, 
+                    in_pos1: position1, in_pos2: position2}
         else:
-            in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch = model.inputs
+            in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_pos1, in_pos2 = model.inputs
             feed_dict = {in_x: sents, in_e1: e1, in_e2: e2, in_dist1: dist1, in_dist2: dist2, 
-                    in_y: relations, in_epoch: epoch}
+                    in_y: relations, in_epoch: epoch, in_pos1: position1, in_pos2: position2}
 
         if is_training:
             _, scores, loss, summary = session.run(
@@ -480,7 +483,7 @@ if __name__ == '__main__':
         # see https://stackoverflow.com/questions/34344836/will-hashtime-time-always-be-unique
 
         print("Cross validate is ", config.cross_validate)
-
+        print("Piecewise Max pooling is ", config.use_piecewise_pool)
 
         if config.cross_validate is True:
             num_folds = 10 # this value will need to be changed depending on the dataset
@@ -497,6 +500,8 @@ if __name__ == '__main__':
             print("All macro F1 scores", config.macro_f1_folds)
             print("Cross validated F1 scores: %.2f +- %.2f"%(mean_macro_f1, std_macro_f1))
             print("ID of the model is", config.id)
+            total_execution_time = sum(config.execution_time_folds)
+            print("Time it took for the model to run", total_execution_time)
             # code to dump the data
             result = {}
             parameters, _ = parser.get_results_dict(config, 0) # we don't care about second val and we also don't care about individual training time here

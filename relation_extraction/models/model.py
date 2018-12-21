@@ -17,12 +17,15 @@ class Model(object):
         # Inputs
         # Sentences
         in_x     = tf.placeholder(dtype=tf.int32, shape=[None, n],                          name='in_x')
-        # Positions
+        # Relative Positions of words in sentence with respect to each entity
         in_dist1 = tf.placeholder(dtype=tf.int32, shape=[None, n],                          name='in_dist1')
         in_dist2 = tf.placeholder(dtype=tf.int32, shape=[None, n],                          name='in_dist2')
         # Entities
         in_e1    = tf.placeholder(dtype=tf.int32, shape=[None, config.max_e1_len],          name='in_e1')
         in_e2    = tf.placeholder(dtype=tf.int32, shape=[None, config.max_e2_len],          name='in_e2')
+        # Positions of the entities (for piecewise splitting of the sentence)
+        in_pos1  = tf.placeholder(dtype=tf.int32, shape=[None],                             name='in_pos1')
+        in_pos2  = tf.placeholder(dtype=tf.int32, shape=[None],                             name='in_pos2')
 
         # Labels
         in_y     = tf.placeholder(dtype=tf.int32, shape=[None],                              name='in_y')
@@ -36,9 +39,9 @@ class Model(object):
             in_elmo = tf.placeholder(dtype=tf.float32, shape=[None, elmo_layers, n, elmo_es],     name='in_elmo')
 
         if config.use_elmo is True:
-            self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_elmo)
+            self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_elmo, in_pos1, in_pos2)
         else:
-            self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch)
+            self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_pos1, in_pos2)
         # TODO(geeticka): Don't comment out, control with a switch. config.verbosity_level.
         #print("Embeddings shape", embed.shape)
         #print("in_dep shape", in_dep.shape)
@@ -87,19 +90,20 @@ class Model(object):
         # x: (batch_size, max_len, embdding_size, 1)
         # w: (filter_size, embdding_size, 1, num_filters)
         if config.use_elmo is True:
-            d = dw + elmo_es + 2*dp
+            d = dw + elmo_es + 2 * dp
             list_to_concatenate = [x, elmo_weighted_sum, dist1, dist2]
         else:
             d = dw + 2 * dp
             list_to_concatenate = [x, dist1, dist2]
 
-        h_pool_flat, filter_sizes = self.simple_convolution(n, d, list_to_concatenate,
-                config.filter_sizes, dc, keep_prob, is_training, '', initializer, regularizer)
+        mode_pool = 'simple_max_pool' if config.use_piecewise_pool is False else 'piecewise_max_pool'
+        h_pool_flat, filter_sizes, num_pieces = self.simple_convolution(n, d, list_to_concatenate, config.filter_sizes,
+                dc, keep_prob, is_training, '', initializer, regularizer, in_pos1, in_pos2, mode_pool)
 
         #TODO: create another convolution and concatenate that pooled output with h_pool_flat after flattening
         # that too
         h_pool_flat_final = h_pool_flat
-        output_d = dc*len(filter_sizes)
+        output_d = dc * num_pieces * len(filter_sizes) # num_pieces is created by piecewise max pooling
         # concatenate with the reverse feature
         # h_pool_flat = tf.concat([h_pool_flat, in_reversed], 1)
 
@@ -224,12 +228,113 @@ class Model(object):
         # need to return the weighted sum of the hidden layer, with the gamma operator
         # the weights need to be trainable
 
+    # based on
+    # https://github.com/nicolay-r/sentiment-pcnn/blob/7dc58bf34eab609aebe258dc1157010653994920/networks/pcnn/pcnn_core.py
+    def piecewise_splitting(self, i, p1_ind, p2_ind, bwc_conv, channels_count, outputs):
+
+        '''
+        Split the tensor into 3 pieces according to the position of the entities in the sentence
+        '''
+        l_ind = tf.minimum(tf.gather(p1_ind, [i]), tf.gather(p2_ind, [i])) #left
+        r_ind = tf.maximum(tf.gather(p1_ind, [i]), tf.gather(p2_ind, [i])) #right
+
+        width = tf.Variable(bwc_conv.shape[1], dtype=tf.int32) # total width (i.e. max sentence length)
+
+        b_slice_from = [i, 0, 0]
+        b_slice_size = tf.concat([[1], l_ind + 1, [channels_count]], 0)
+        m_slice_from = tf.concat([[i], l_ind + 1, [0]], 0)
+        m_slice_size = tf.concat([[1], r_ind - l_ind, [channels_count]], 0)
+        a_slice_from = tf.concat([[i], r_ind + 1, [0]], 0)
+        a_slice_size = tf.concat([[1], width - r_ind - 1, [channels_count]], 0)
+
+        bwc_split_b = tf.slice(bwc_conv, b_slice_from, b_slice_size)
+        bwc_split_m = tf.slice(bwc_conv, m_slice_from, m_slice_size)
+        bwc_split_a = tf.slice(bwc_conv, a_slice_from, a_slice_size)
+       
+
+        pad_b = tf.concat([[[0,0]],
+                            tf.reshape(tf.concat([width - l_ind - 1, [0]], 0), shape=[1,2]),
+                            [[0,0]]],
+                            axis=0)
+        
+        pad_m = tf.concat([[[0,0]],
+                            tf.reshape(tf.concat([width - r_ind + l_ind, [0]], 0), shape=[1,2]),
+                            [[0,0]]],
+                            axis=0)
+
+        pad_a = tf.concat([[[0,0]],
+                            tf.reshape(tf.concat([r_ind + 1, [0]], 0), shape=[1,2]),
+                            [[0,0]]],
+                            axis=0)
+
+        bwc_split_b = tf.pad(bwc_split_b, pad_b, constant_values=tf.float32.min)
+        bwc_split_m = tf.pad(bwc_split_m, pad_m, constant_values=tf.float32.min)
+        bwc_split_a = tf.pad(bwc_split_a, pad_a, constant_values=tf.float32.min)
+
+        outputs = outputs.write(i, [[bwc_split_b, bwc_split_m, bwc_split_a]])
+
+        i += 1
+        return i, p1_ind, p2_ind, bwc_conv, channels_count, outputs
+
+    def piecewise_max_pooling(self, h, p1_ind, p2_ind):
+        '''
+        Given the output of the tanh function, in the shape batch_size, max_sen_len, 1, channels_count
+        and the location of the ending index of the 2 entities, perform the splitting and
+        return a piecewise max pooled operation
+        '''
+        num_pieces = 3
+        dc = int(h.shape[-1])
+        max_sen_len = int(h.shape[1])
+        bwc_conv = tf.squeeze(h)
+        bwc_conv = tf.reshape(bwc_conv, [-1, max_sen_len, dc])
+
+        variable_batch_size = tf.shape(h)[0]
+        # handling variable batch size according to
+        #https://stackoverflow.com/questions/40685087/tensorflow-converting-unknown-dimension-size-of-a-tensor-to-int
+        sliced = tf.TensorArray(dtype=tf.float32, size=variable_batch_size, infer_shape=False, dynamic_size=True)
+        _, _, _, _, _, sliced = tf.while_loop(
+                    lambda i, *_: tf.less(i, variable_batch_size),
+                    self.piecewise_splitting,
+                    [0, p1_ind, p2_ind, bwc_conv, dc, sliced])
+
+        # concat is needed below to convert all individual tensors into one tensor
+        sliced = tf.squeeze(sliced.concat()) # batch_size, slices, max_sen_len, channels_count
+        sliced = tf.reshape(sliced, [variable_batch_size, num_pieces, max_sen_len, dc])
+        bwgc_mpool = tf.nn.max_pool(sliced,
+                ksize=[1, 1, max_sen_len, 1],
+                strides=[1, 1, max_sen_len, 1],
+                padding='SAME')
+        #TODO (geeticka) need to reshape in piecewise_splitting
+        bwc_mpool = tf.squeeze(bwgc_mpool, [2]) # because the 3rd dimension becomes 1
+
+        bcw_mpool = tf.transpose(bwc_mpool, perm=[0,2,1]) #TODO (geeticka) why is this transpose needed?
+        bc_pmpool = tf.reshape(bcw_mpool, [-1, num_pieces*dc]) 
+        # 3 depends on the number of pieces generated in piecewise_splitting
+        return bc_pmpool, num_pieces
+
+    def simple_max_pooling(self, h):
+        '''
+        Given the output of the tanh function, in the shape batch_size, max_sen_len, 1, channels_count
+        perform a simple max pooling over the whole sentence
+        '''
+        num_pieces = 1 # this is as if only one piece exists
+        max_sen_len = int(h.shape[1])
+        dc = int(h.shape[-1])
+        pool = tf.nn.max_pool(h,
+                ksize=[1, max_sen_len, 1, 1],
+                strides=[1, max_sen_len, 1, 1],
+                padding='SAME')
+        pool = tf.reshape(pool, [-1, dc])
+        return pool, num_pieces
+    
     def simple_convolution(self, max_sen_len, dim, list_to_concatenate, filter_sizes,
-            filter_dimension, keep_prob, is_training, prefix, initializer, regularizer):
+            channels_count, keep_prob, is_training, prefix, initializer, regularizer,
+            p1_ind, p2_ind, mode='simple_max_pool'):
         # x: (batch_size, max_sen_len, embdding_size, 1)
         # w: (filter_size, embedding_size, 1, num_filters)
+
         d = dim
-        dc = filter_dimension
+        dc = channels_count
         n = max_sen_len
         filter_sizes = [int(size) for size in filter_sizes.split(',')]
         pooled_outputs = []
@@ -245,7 +350,6 @@ class Model(object):
         #print("x_conv shape", x_conv.shape)
         if is_training and keep_prob < 1:
             x_conv = tf.nn.dropout(x_conv, keep_prob)
-
         for i, k in enumerate(filter_sizes):
           with tf.variable_scope("conv-%d" % k):# , reuse=False
             w = tf.get_variable(initializer=initializer,shape=[k, d, 1, dc],name='weight'+prefix,
@@ -255,21 +359,15 @@ class Model(object):
             conv = tf.nn.conv2d(x_conv, w, strides=[1,1,d,1],padding="SAME")
             #print("conv shape", conv.shape)
             h = tf.nn.tanh(tf.nn.bias_add(conv,b),name="h"+prefix) # bz, n, 1, dc
-            #print("h shape", h.shape)
-            # max pooling
-            pooled = tf.nn.max_pool(h,
-                                ksize=[1,n,1,1],
-                                strides=[1,n,1,1],
-                                padding="SAME"
-                  )
-            #print("Pooled shape", pooled.shape)
-            pooled_outputs.append(pooled)
-        h_pool = tf.concat(pooled_outputs, 3)
-        #print("h_pool before flattening", h_pool.shape)
-        h_pool_flat = tf.reshape(h_pool,[-1,dc*len(filter_sizes)])
-        #print("h_pool_flat before flattening", h_pool_flat.shape)
+            if mode == 'simple_max_pool':
+                bc_pmpool, num_pieces = self.simple_max_pooling(h)
+            else:
+                bc_pmpool, num_pieces = self.piecewise_max_pooling(h, p1_ind, p2_ind)
+            pooled_outputs.append(bc_pmpool)
+        h_pool_flat = tf.concat(pooled_outputs, -1) # concatenate over the last dimension which is channels
+        #print("h_pool_flat", h_pool_flat.shape)
 
         if is_training and keep_prob < 1:
             h_pool_flat = tf.nn.dropout(h_pool_flat, keep_prob)
 
-        return h_pool_flat, filter_sizes
+        return h_pool_flat, filter_sizes, num_pieces

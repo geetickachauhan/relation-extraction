@@ -1,8 +1,9 @@
 import argparse
 import copy
 import time
-#Arguments that must be provided: dataset, use_elmo
-# Arguments that are commonly provided: cross validate, use_test
+#Arguments that should be provided: dataset: when extending to other datasets this will be useful
+#                                   use_elmo: increases runtime so just for testing don't use
+# Arguments that are commonly provided: cross validate, use_test, use_piecewise_pool
 # boolean arguments should be provided like --cross_validate without any other value
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='semeval2010',
@@ -109,6 +110,8 @@ parser.add_argument('--use_test', default=False, action='store_true',
                                                 help='use the full train and test data split')
 parser.add_argument('--use_elmo', default=False, action='store_true',
                                                 help='whether to use the elmo embeddings')
+parser.add_argument('--use_piecewise_pool', default=False, action='store_true',
+                                                help='whether to do piecewise max pooling')
 parser.add_argument('--hyperparam_tuning_mode', default=False, action='store_true',
                                                 help='whether hyperparameter tuning mode was on')
 
@@ -164,6 +167,7 @@ def get_results_dict(config, train_start_time_in_miliseconds):
     parameters['cross_validate'] = config.cross_validate
     parameters['use_test'] = config.use_test
     parameters['use_elmo'] = config.use_elmo
+    parameters['use_piecewise_pool'] = config.use_piecewise_pool
     #parameters['dev_size'] = config.dev_size
     #parameters['use_lemmas'] = config.use_lemmas
     # parameters['fold'] = config.fold
