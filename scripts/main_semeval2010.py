@@ -287,9 +287,9 @@ def output_model(config):
         config.output_folder = os.path.join(config.output_dir,"NoCrossValidation", model_name)
     #config.tensorboard_folder = os.path.join(config.output_dir, "Tensorboard", hyperparam_dir_addition)
 
-    config.tensorboard_folder = os.path.join(config.output_dir, folder_string)
+    config.tensorboard_folder = config.output_folder
     config.result_folder = os.path.join(config.output_dir, folder_string, model_name, 'Result')
-    print("Tensorboard folder, shared across all folds, different for each run is",
+    print("Tensorboard folder, for current fold is",
             config.tensorboard_folder)
     main_utils.create_folder_if_not_exists(config.output_folder)
     main_utils.create_folder_if_not_exists(config.tensorboard_folder)
