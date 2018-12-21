@@ -77,8 +77,9 @@ class Model(object):
 
 
         # embdding lookup
-        # e1 = tf.nn.embedding_lookup(embed, in_e1, name='e1')# bz,dw
-        # e2 = tf.nn.embedding_lookup(embed, in_e2, name='e2')# bz,dw
+        if config.use_entity_embed is True:
+            e1 = tf.nn.embedding_lookup(embed, in_e1, name='e1')# bz,dw
+            e2 = tf.nn.embedding_lookup(embed, in_e2, name='e2')# bz,dw
         x     = tf.nn.embedding_lookup(embed,      in_x,     name='x')   # bz,n,dw
         dist1 = tf.nn.embedding_lookup(pos1_embed, in_dist1, name='dist1')#bz, n, k,dp
         dist2 = tf.nn.embedding_lookup(pos2_embed, in_dist2, name='dist2')# bz, n, k,dp
@@ -104,6 +105,16 @@ class Model(object):
         # that too
         h_pool_flat_final = h_pool_flat
         output_d = dc * num_pieces * len(filter_sizes) # num_pieces is created by piecewise max pooling
+        
+        if config.use_entity_embed is True:
+            e1 = tf.reduce_max(e1, axis=1)
+            e2 = tf.reduce_max(e2, axis=1)
+            e_flat = tf.concat([e1,e2],1)
+            h_pool_flat_final = tf.concat([h_pool_flat_final, e_flat], 1)
+            output_d = dc * num_pieces *len(filter_sizes) + dw * 2
+
+        if is_training and keep_prob < 1:
+            h_pool_flat_final = tf.nn.dropout(h_pool_flat_final, keep_prob)
         # concatenate with the reverse feature
         # h_pool_flat = tf.concat([h_pool_flat, in_reversed], 1)
 
@@ -366,8 +377,5 @@ class Model(object):
             pooled_outputs.append(bc_pmpool)
         h_pool_flat = tf.concat(pooled_outputs, -1) # concatenate over the last dimension which is channels
         #print("h_pool_flat", h_pool_flat.shape)
-
-        if is_training and keep_prob < 1:
-            h_pool_flat = tf.nn.dropout(h_pool_flat, keep_prob)
 
         return h_pool_flat, filter_sizes, num_pieces

@@ -484,7 +484,7 @@ if __name__ == '__main__':
 
         print("Cross validate is ", config.cross_validate)
         print("Piecewise Max pooling is ", config.use_piecewise_pool)
-
+        print("Entity Appending to fixed size sent rep is ", config.use_entity_embed)
         if config.cross_validate is True:
             num_folds = 10 # this value will need to be changed depending on the dataset
             for config.fold in range(0, num_folds):
