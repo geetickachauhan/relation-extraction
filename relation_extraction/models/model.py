@@ -23,7 +23,7 @@ class Model(object):
         # Entities
         in_e1    = tf.placeholder(dtype=tf.int32, shape=[None, config.max_e1_len],          name='in_e1')
         in_e2    = tf.placeholder(dtype=tf.int32, shape=[None, config.max_e2_len],          name='in_e2')
-        # Positions of the entities (for piecewise splitting of the sentence)
+        # Positions of the pieces (for piecewise splitting of the sentence)
         in_pos1  = tf.placeholder(dtype=tf.int32, shape=[None],                             name='in_pos1')
         in_pos2  = tf.placeholder(dtype=tf.int32, shape=[None],                             name='in_pos2')
 
@@ -35,11 +35,15 @@ class Model(object):
         # embeddings
         embed = tf.get_variable(initializer=embeddings, dtype=tf.float32, name='word_embed')
         if config.use_elmo is True:
+            # Positions of the entities (for grabbing the elmo embeddings)
+            in_e1_pos = tf.placeholder(dtype=tf.int32, shape=[None, 2],                         name='in_e1_pos')
+            in_e2_pos = tf.placeholder(dtype=tf.int32, shape=[None, 2],                         name='in_e2_pos')
             # 3 is num of layers in LM and 1024 is hidden layer dimension in the elmo model, to be converted to variable
             in_elmo = tf.placeholder(dtype=tf.float32, shape=[None, elmo_layers, n, elmo_es],     name='in_elmo')
 
         if config.use_elmo is True:
-            self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_elmo, in_pos1, in_pos2)
+            self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_elmo, in_pos1, in_pos2, 
+                    in_e1_pos, in_e2_pos)
         else:
             self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_pos1, in_pos2)
         # TODO(geeticka): Don't comment out, control with a switch. config.verbosity_level.
@@ -107,11 +111,21 @@ class Model(object):
         output_d = dc * num_pieces * len(filter_sizes) # num_pieces is created by piecewise max pooling
         
         if config.use_entity_embed is True:
-            e1 = tf.reduce_max(e1, axis=1)
-            e2 = tf.reduce_max(e2, axis=1)
-            e_flat = tf.concat([e1,e2],1)
-            h_pool_flat_final = tf.concat([h_pool_flat_final, e_flat], 1)
-            output_d = dc * num_pieces *len(filter_sizes) + dw * 2
+            #e1 = tf.reduce_max(e1, axis=1)
+            #e2 = tf.reduce_max(e2, axis=1)
+            #e_flat = tf.concat([e1,e2],1)
+            if config.use_elmo is True:
+                e1_elmo = self.get_elmo_entities(elmo_weighted_sum, in_e1_pos)
+                e2_elmo = self.get_elmo_entities(elmo_weighted_sum, in_e2_pos)
+                e1_elmo = tf.reduce_max(e1_elmo, axis=1)
+                e2_elmo = tf.reduce_max(e2_elmo, axis=1)
+                e_flat_elmo = tf.concat([e1_elmo, e2_elmo], 1)
+                h_pool_flat_final = tf.concat([h_pool_flat_final, e_flat_elmo], 1)
+                output_d = dc * num_pieces * len(filter_sizes) + elmo_es * 2
+                #print("e1_elmo shape", e1_elmo.shape)
+                #print("e2_elmo shape", e2_elmo.shape)
+            #h_pool_flat_final = tf.concat([h_pool_flat_final, e_flat], 1)
+            #output_d = dc * num_pieces *len(filter_sizes) + dw * 2
 
         if is_training and keep_prob < 1:
             h_pool_flat_final = tf.nn.dropout(h_pool_flat_final, keep_prob)
@@ -238,6 +252,49 @@ class Model(object):
         return weighted_lm_layers
         # need to return the weighted sum of the hidden layer, with the gamma operator
         # the weights need to be trainable
+
+    def get_elmo_entity(self, i, elmo_weighted_sum, in_e_pos, outputs):
+        '''
+        For each sample, get the elmo weighted sum of the entity, 
+        helper method for tf.while_loop
+        '''
+        positions = tf.gather(in_e_pos, [i], axis=0) # shape 1,2
+        l_ind = tf.minimum(positions[0][0], positions[0][1])
+        r_ind = tf.maximum(positions[0][0], positions[0][1])
+        width = tf.Variable(elmo_weighted_sum.shape[1], dtype=tf.int32) # total width (i.e. max sentence length)
+        embedding_dim = tf.Variable(elmo_weighted_sum.shape[-1], dtype=tf.int32)
+
+        slice_from = [i, l_ind, 0]
+        slice_size = [1, r_ind - l_ind + 1, embedding_dim]
+        #slice_size = tf.concat([[1], [r_ind - l_ind + 1], [embedding_dim]], 0)
+        split = tf.slice(elmo_weighted_sum, slice_from, slice_size)
+        
+        padding = tf.concat([[[0,0]],
+                          tf.reshape([[0, width - r_ind + l_ind - 1]], shape=[1,2]),
+                          [[0,0]]],
+                          axis=0)
+        split = tf.pad(split, padding, constant_values=tf.float32.min) # needs to be 0 if doing an avg over
+        # the words in the entity, but since doing a max, this is ok
+        outputs = outputs.write(i, [split])
+        
+        i += 1
+        return i, elmo_weighted_sum, in_e_pos, outputs
+
+    def get_elmo_entities(self, elmo_weighted_sum, in_e_pos):
+        elmo_es = int(elmo_weighted_sum.shape[-1])
+        variable_batch_size = tf.shape(elmo_weighted_sum)[0]
+        max_sen_len = int(elmo_weighted_sum.shape[1]) # shape of elmo_weighted_sum = batch_size, 
+        # handling variable batch size according to
+        #https://stackoverflow.com/questions/40685087/tensorflow-converting-unknown-dimension-size-of-a-tensor-to-int
+        sliced = tf.TensorArray(dtype=tf.float32, size=variable_batch_size, infer_shape=False, dynamic_size=True)
+        _, _, _, sliced = tf.while_loop(
+                    lambda i, *_: tf.less(i, variable_batch_size),
+                    self.get_elmo_entity,
+                    [0, elmo_weighted_sum, in_e_pos, sliced])
+
+        sliced = tf.squeeze(sliced.concat()) # batch_size, max_sen_len, 1024 (i.e. elmo embedding size)
+        sliced = tf.reshape(sliced, [variable_batch_size, max_sen_len, elmo_es])
+        return sliced
 
     # based on
     # https://github.com/nicolay-r/sentiment-pcnn/blob/7dc58bf34eab609aebe258dc1157010653994920/networks/pcnn/pcnn_core.py

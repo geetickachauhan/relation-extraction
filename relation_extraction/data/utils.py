@@ -568,9 +568,13 @@ def vectorize(config, data, word_dict):
     position1 = list(map(lambda x: x[1], e1_pos))
     position2 = list(map(lambda x: x[1], e2_pos))
     if config.use_elmo is True: 
+        e1_pos_as_list = list(map(lambda x: [x[0], x[1]], e1_pos))
+        e2_pos_as_list = list(map(lambda x: [x[0], x[1]], e2_pos))
         return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2, \
-    padded_elmo_embeddings, position1, position2
-    return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2, position1, position2
+    padded_elmo_embeddings, position1, position2, e1_pos_as_list, e2_pos_as_list
+    
+    return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2, position1, \
+            position2
     # we are also returning the ending positions of the entity 1 and entity 2
 
 def pos(x):
