@@ -111,21 +111,22 @@ class Model(object):
         output_d = dc * num_pieces * len(filter_sizes) # num_pieces is created by piecewise max pooling
         
         if config.use_entity_embed is True:
-            #e1 = tf.reduce_max(e1, axis=1)
-            #e2 = tf.reduce_max(e2, axis=1)
-            #e_flat = tf.concat([e1,e2],1)
+            e1 = tf.reduce_max(e1, axis=1)
+            e2 = tf.reduce_max(e2, axis=1)
+            e_flat = tf.concat([e1,e2],1)
             if config.use_elmo is True:
                 e1_elmo = self.get_elmo_entities(elmo_weighted_sum, in_e1_pos)
                 e2_elmo = self.get_elmo_entities(elmo_weighted_sum, in_e2_pos)
                 e1_elmo = tf.reduce_max(e1_elmo, axis=1)
                 e2_elmo = tf.reduce_max(e2_elmo, axis=1)
                 e_flat_elmo = tf.concat([e1_elmo, e2_elmo], 1)
-                h_pool_flat_final = tf.concat([h_pool_flat_final, e_flat_elmo], 1)
-                output_d = dc * num_pieces * len(filter_sizes) + elmo_es * 2
+                h_pool_flat_final = tf.concat([h_pool_flat_final, e_flat, e_flat_elmo], 1)
+                output_d = dc * num_pieces * len(filter_sizes) + elmo_es * 2 + dw*2
                 #print("e1_elmo shape", e1_elmo.shape)
                 #print("e2_elmo shape", e2_elmo.shape)
-            #h_pool_flat_final = tf.concat([h_pool_flat_final, e_flat], 1)
-            #output_d = dc * num_pieces *len(filter_sizes) + dw * 2
+            else:
+                h_pool_flat_final = tf.concat([h_pool_flat_final, e_flat], 1)
+                output_d = dc * num_pieces *len(filter_sizes) + dw * 2
 
         if is_training and keep_prob < 1:
             h_pool_flat_final = tf.nn.dropout(h_pool_flat_final, keep_prob)
