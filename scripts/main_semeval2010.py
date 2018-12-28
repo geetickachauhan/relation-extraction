@@ -42,16 +42,26 @@ if config.dataset == 'semeval2010':
 elif config.dataset == 'ddi':
     relation_dict = {0: 'advise', 1: 'effect', 2: 'mechanism', 3: 'int', 4: 'none'}
     config.classnum = max(relation_dict.keys()) + 1 # 5 classes are being predicted
+    #TODO (geeticka): change this based on drugbank, medline specific testing 
+    config.data_root = "/data/medg/misc/semeval_2010/medical-data/DDICorpus/pre-processed/extraction/"
+    config.embedding_file = '/data/medg/misc/semeval_2010/medical-data/wikipedia-pubmed-and-PMC-w2v.txt'
 
 def res(path): return os.path.join(config.data_root, path)
 
 TRAIN, DEV, TEST = 0, 1, 2
 #TODO: (geeticka) when you read the dependency paths with labels, use get_only_words
+if config.dataset == 'semeval2010':
+    folds = 10
+    middle = '-dep-dir'
+elif config.dataset == 'ddi':
+    folds = 5
+    middle = ''
+
 dataset = \
-data_utils.Dataset(res('pickled-files/seed_{K}_10-dep-dir-fold-border_{N}.pkl').format(K=config.pickle_seed,
-    N=config.border_size))
-print("pickled files:", res('pickled-files/seed_{K}_10-dep-dir-fold-border_{N}.pkl').format(K=config.pickle_seed,
-    N=config.border_size))
+data_utils.Dataset(res('pickled-files/seed_{K}_{folds}{middle}-fold-border_{N}.pkl').format(K=config.pickle_seed,
+    N=config.border_size, middle=middle, folds=folds))
+print("pickled files:", res('pickled-files/seed_{K}_{folds}{middle}-fold-border_{N}.pkl').format(K=config.pickle_seed,
+    N=config.border_size, middle=middle, folds=folds))
 
 date_of_experiment_start = None
 
@@ -448,11 +458,6 @@ if __name__ == '__main__':
 
         assert len(config.lr_boundaries) == len(config.lr_values) - 1
 
-        if config.dataset == 'ddi':
-            #TODO (geeticka): change this based on drugbank, medline specific testing 
-            config.data_root = "/data/medg/misc/semeval_2010/medical-data/DDICorpus/pre-processed/extraction/"
-            config.embedding_file = '/data/medg/misc/semeval_2010/medical-data/wikipedia-pubmed-and-PMC-w2v.txt'
-        
         # create the necessary output folders
         config.output_dir = '/scratch/geeticka/relation-extraction/output/' + config.dataset + '/'
         main_utils.create_folder_if_not_exists(config.output_dir)
