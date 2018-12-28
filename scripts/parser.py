@@ -1,12 +1,12 @@
 import argparse
 import copy
 import time
-#Arguments that must be provided: dataset, id,
+#Arguments that must be provided: dataset
 # Arguments that are commonly provided: cross validate, use_test
 # boolean arguments should be provided like --cross_validate without any other value
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='semeval2010',
-                                        help='the dataset for which the task is being applied')
+        help='the dataset for which the task is being applied. Options: semeval2010, ddi')
 parser.add_argument('--id', default='baseline', # this will get overwritten in the code by uuid 
                                         help="a name for identifying the model")
 parser.add_argument('--pos_embed_size', default=25, type=int,

@@ -21,27 +21,28 @@ import parser
 import copy
 import json
 
+from sklearn.metrics import f1_score
+
 logging.getLogger().setLevel(logging.INFO)
 #parser = argparse.ArgumentParser()
 
-relation_dict = {0:'Component-Whole(e2,e1)', 1:'Instrument-Agency(e2,e1)', 2:'Member-Collection(e1,e2)',
-3:'Cause-Effect(e2,e1)', 4:'Entity-Destination(e1,e2)', 5:'Content-Container(e1,e2)',
-6:'Message-Topic(e1,e2)', 7:'Product-Producer(e2,e1)', 8:'Member-Collection(e2,e1)',
-9:'Entity-Origin(e1,e2)', 10:'Cause-Effect(e1,e2)', 11:'Component-Whole(e1,e2)',
-12:'Message-Topic(e2,e1)', 13:'Product-Producer(e1,e2)', 14:'Entity-Origin(e2,e1)',
-15:'Content-Container(e2,e1)', 16:'Instrument-Agency(e1,e2)', 17:'Entity-Destination(e2,e1)',
-18:'Other'}
-
-isreversed_dictionary = {0:'1', 1:'1', 2:'0', 3:'1', 4:'0', 5:'0', 6:'0', 7:'1',
-8:'1', 9:'0', 10:'0', 11:'0', 12:'1', 13:'0', 14:'1', 15:'1', 16:'0', 17:'1', 18:'0'}
 config = parser.get_config()
 
-config.classnum = max(relation_dict.keys()) #TODO (geeticka): remove all arguments from config that are not
-# passed in, for example folds and macro_f1_folds etc
 
-#TODO: (geeticka) change above to not say +1 : we are not considering the "other" class.
+if config.dataset == 'semeval2010':
+    relation_dict = {0:'Component-Whole(e2,e1)', 1:'Instrument-Agency(e2,e1)', 2:'Member-Collection(e1,e2)',
+    3:'Cause-Effect(e2,e1)', 4:'Entity-Destination(e1,e2)', 5:'Content-Container(e1,e2)',
+    6:'Message-Topic(e1,e2)', 7:'Product-Producer(e2,e1)', 8:'Member-Collection(e2,e1)',
+    9:'Entity-Origin(e1,e2)', 10:'Cause-Effect(e1,e2)', 11:'Component-Whole(e1,e2)',
+    12:'Message-Topic(e2,e1)', 13:'Product-Producer(e1,e2)', 14:'Entity-Origin(e2,e1)',
+    15:'Content-Container(e2,e1)', 16:'Instrument-Agency(e1,e2)', 17:'Entity-Destination(e2,e1)',
+    18:'Other'}
+    config.classnum = max(relation_dict.keys()) # we are not considering the "other" class.
+    #TODO (geeticka): remove all arguments from config that are not passed in, for example folds and macro_f1_folds etc
+elif config.dataset == 'ddi':
+    relation_dict = {0: 'advise', 1: 'effect', 2: 'mechanism', 3: 'int', 4: 'none'}
+    config.classnum = max(relation_dict.keys()) + 1 # 5 classes are being predicted
 
-# remove the is reversed FEATURE
 def res(path): return os.path.join(config.data_root, path)
 
 TRAIN, DEV, TEST = 0, 1, 2
@@ -49,7 +50,7 @@ TRAIN, DEV, TEST = 0, 1, 2
 dataset = \
 data_utils.Dataset(res('pickled-files/seed_{K}_10-dep-dir-fold-border_{N}.pkl').format(K=config.pickle_seed,
     N=config.border_size))
-print("border size:", 'pickled-files/seed_{K}_10-dep-dir-fold-border_{N}.pkl'.format(K=config.pickle_seed,
+print("pickled files:", res('pickled-files/seed_{K}_10-dep-dir-fold-border_{N}.pkl').format(K=config.pickle_seed,
     N=config.border_size))
 
 date_of_experiment_start = None
@@ -60,9 +61,12 @@ def prediction(scores):
     pred = np.zeros(data_size)
     for idx in range(data_size):
         data_line = scores[idx]
-        if all(data_line <= 0.):
-            pred[idx] = 18
-        else:
+        if config.dataset == 'semeval2010':
+            if all(data_line <= 0.):
+                pred[idx] = 18
+            else:
+                pred[idx] = np.argmax(data_line)
+        elif config.dataset == 'ddi':
             pred[idx] = np.argmax(data_line)
 
     return pred
@@ -232,7 +236,10 @@ def init():
     word_dict = data_utils.build_dict(all_data, config.remove_stop_words, config.low_freq_thresh)
     logging.info('total words: %d' % len(word_dict))
 
-    embeddings = data_utils.load_embedding_senna(config, word_dict)
+    if config.dataset == 'semeval2010':
+        embeddings = data_utils.load_embedding_senna(config, word_dict)
+    elif config.dataset == 'ddi':
+        embeddings = data_utils.load_embedding(config, word_dict)
 
     config.max_len = main_utils.max_length_all_data(train_data[0], dev_data[0], 'sentence')
     config.max_e1_len = main_utils.max_length_all_data(train_data[2], dev_data[2], 'entity')
@@ -348,21 +355,25 @@ def main():
                         dev_iter   = data_utils.batch_iter(config.seed, main_utils.stack_data(dev_vec),   bz, shuffle=False)
                         if config.early_stop is True:
                             early_stop_iter = data_utils.batch_iter(config.seed, main_utils.stack_data(early_stop_vec), bz, shuffle=False)
-                        train_verbosity = False if config.cross_validate is False else True
-                        train_acc, _ = run_epoch(session, m_train, train_iter, epoch, verbose=False)
+                        train_verbosity = True if config.cross_validate is False else False
+                        train_acc, _ = run_epoch(session, m_train, train_iter, epoch, verbose=train_verbosity)
 
                         # TODO(geeticka): Why separate model (e.g. why m_eval vs. m_train)?
                         dev_acc, dev_preds = run_epoch(
                             session, m_eval, dev_iter, epoch, verbose=False, is_training=False
                         )
 
-                        config.result_filepath = os.path.join(config.output_folder, config.result_file)
-                        config.dev_answer_filepath = os.path.join(
-                            config.output_folder, config.dev_answer_file
-                        )
+                        if config.dataset == 'semeval2010':
+                            config.result_filepath = os.path.join(config.output_folder, config.result_file)
+                            config.dev_answer_filepath = os.path.join(
+                                config.output_folder, config.dev_answer_file
+                            )
 
-                        macro_f1_dev = main_utils.evaluate(config.result_filepath, config.dev_answer_filepath,
-                                relation_dict, dev_data_orin, dev_preds)
+                            macro_f1_dev = main_utils.evaluate(config.result_filepath, config.dev_answer_filepath,
+                                    relation_dict, dev_data_orin, dev_preds)
+                        elif config.dataset == 'ddi':
+                            macro_f1_dev = f1_score(dev_data_orin, dev_preds, average='macro')
+                            macro_f1_dev = round(macro_f1_dev, 2)
 
                         if config.early_stop is True:
                             early_stop_acc, early_stop_preds = run_epoch(
@@ -437,6 +448,11 @@ if __name__ == '__main__':
 
         assert len(config.lr_boundaries) == len(config.lr_values) - 1
 
+        if config.dataset == 'ddi':
+            #TODO (geeticka): change this based on drugbank, medline specific testing 
+            config.data_root = "/data/medg/misc/semeval_2010/medical-data/DDICorpus/pre-processed/extraction/"
+            config.embedding_file = '/data/medg/misc/semeval_2010/medical-data/wikipedia-pubmed-and-PMC-w2v.txt'
+        
         # create the necessary output folders
         config.output_dir = '/scratch/geeticka/relation-extraction/output/' + config.dataset + '/'
         main_utils.create_folder_if_not_exists(config.output_dir)
@@ -459,6 +475,7 @@ if __name__ == '__main__':
                 main()
                 end_time = time.time()
                 execution_time = (end_time - start_time)/3600.0 #in hours
+                execution_time = round(execution_time, 2)
                 config.execution_time_folds.append(execution_time)
 
             mean_macro_f1 = np.mean(config.macro_f1_folds)
