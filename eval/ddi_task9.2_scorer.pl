@@ -79,12 +79,9 @@ my $ANSWER_KEYS_FILE_NAME      = $ARGV[1];
 ################
 
 my (%confMatrix5way, %confMatrix2way) = ();
-#my (%confMatrix19way, %confMatrix10wayNoDir, %confMatrix10wayWithDir) = ();
 my (%idsProposed, %idsAnswer) = ();
-my (%allLabels5waylAnswer, %allLabels2wayAnswer) = ();
-#my (%allLabels19waylAnswer, %allLabels10wayAnswer) = ();
+my (%allLabels5wayAnswer, %allLabels2wayAnswer) = ();
 my (%allLabels5wayProposed, %allLabels2wayProposed) = ();
-#my (%allLabels19wayProposed, %allLabels10wayNoDirProposed, %allLabels10wayWithDirProposed) = ();
 
 ### 1. Read the file contents
 my $totalProposed = &readFileIntoHash($PROPOSED_ANSWERS_FILE_NAME, \%idsProposed);
@@ -118,31 +115,31 @@ foreach my $id (keys %idsAnswer) {
 
 	### 3.1. Update the 5-way answer distribution
 	my $labelAnswer = $idsAnswer{$id};
-	$allLabels5waylAnswer{$labelAnswer}++;
+	$allLabels5wayAnswer{$labelAnswer}++;
 
 	### 3.2. Update the 2-way answer distribution
 	my $labelAnswer2way = $labelAnswer;
-        $labelAnswer2way = &getrelationexistance($labelAnswer2way};
+        $labelAnswer2way = &getrelationexistance($labelAnswer2way);
 	$allLabels2wayAnswer{$labelAnswer2way}++;
 }
 
 ### 4. Check for proposed classes that are not contained in the answer key file: this may happen in cross-validation
 foreach my $labelProposed (sort keys %allLabels5wayProposed) {
-	if (!defined($allLabels5waylAnswer{$labelProposed})) {
+	if (!defined($allLabels5wayAnswer{$labelProposed})) {
 		print "!!!WARNING!!! The proposed file contains $allLabels5wayProposed{$labelProposed} label(s) of type '$labelProposed', which is NOT present in the key file.\n\n";
 	}
 }
 
 ### 4. 5-way evaluation
 print "<<< 5-WAY EVALUATION >>>:\n\n";
-my $fiveway = &evaluate(\%confMatrix5way, \%allLabels5wayProposed, \%allLabels5waylAnswer, $totalProposed, $totalAnswer, 1);
+my $fiveway = &evaluate(\%confMatrix5way, \%allLabels5wayProposed, \%allLabels5wayAnswer, $totalProposed, $totalAnswer, 1);
 
 print "<<< 5-WAY EVALUATION (without using None) >>>:\n\n";
-my $fiveway_notnone = &evaluate(\%confMatrix5way, \%allLabels5wayProposed, \%allLabels5waylAnswer, $totalProposed, $totalAnswer, 0);
+my $fiveway_notnone = &evaluate(\%confMatrix5way, \%allLabels5wayProposed, \%allLabels5wayAnswer, $totalProposed, $totalAnswer, 0);
 
 ### 5. 2-way evaluation
 print "<<< 2-WAY EVALUATION >>>:\n\n";
-my $twoway = &evaluate(\%confMatrix2way, \%allLabels2way, \%allLabels2way, $totalProposed, $totalAnswer, 1);
+my $twoway = &evaluate(\%confMatrix2way, \%allLabels2wayProposed, \%allLabels2wayAnswer, $totalProposed, $totalAnswer, 1);
 
 
 ### 7. Output the 3 macro F1 values
@@ -297,14 +294,14 @@ sub evaluate() {
 
 		### 8.1. Calculate P/R/F1
 		my $P  = (0 == $$allLabelsProposed{$labelAnswer}) ? 0
-				: 100.0 * $$confMatrix{$labelAnswer}{$labelAnswer} / ($$allLabelsProposed{$labelAnswer} + $wrongDirectionCnt);
+				: 100.0 * $$confMatrix{$labelAnswer}{$labelAnswer} / $$allLabelsProposed{$labelAnswer};
 		my $R  = (0 == $$allLabelsAnswer{$labelAnswer}) ? 0
 				: 100.0 * $$confMatrix{$labelAnswer}{$labelAnswer} / $$allLabelsAnswer{$labelAnswer};
 		my $F1 = (0 == $P + $R) ? 0 : 2 * $P * $R / ($P + $R);
 
 		### 8.3. Output P/R/F1
 		printf "%25s%s%4d%s%4d%s%6.2f", $labelAnswer,
-			" :    P = ", $$confMatrix{$labelAnswer}{$labelAnswer}, '/', ($$allLabelsProposed{$labelAnswer} + $wrongDirectionCnt), ' = ', $P;
+			" :    P = ", $$confMatrix{$labelAnswer}{$labelAnswer}, '/', $$allLabelsProposed{$labelAnswer}, ' = ', $P;
 		printf"%s%4d%s%4d%s%6.2f%s%6.2f%s\n",
 		  	 "%     R = ", $$confMatrix{$labelAnswer}{$labelAnswer}, '/', $$allLabelsAnswer{$labelAnswer},   ' = ', $R,
 			 "%     F1 = ", $F1, '%';
@@ -315,7 +312,7 @@ sub evaluate() {
 			$macroR  += $R;
 			$macroF1 += $F1;
 			$microCorrect += $$confMatrix{$labelAnswer}{$labelAnswer};
-			$microProposed += $$allLabelsProposed{$labelAnswer} + $wrongDirectionCnt;
+			$microProposed += $$allLabelsProposed{$labelAnswer};
 			$microAnswer += $$allLabelsAnswer{$labelAnswer};
 		}
 		elsif ($labelAnswer ne '_Other') {
@@ -323,7 +320,7 @@ sub evaluate() {
 			$macroR  += $R;
 			$macroF1 += $F1;
 			$microCorrect += $$confMatrix{$labelAnswer}{$labelAnswer};
-			$microProposed += $$allLabelsProposed{$labelAnswer} + $wrongDirectionCnt;
+			$microProposed += $$allLabelsProposed{$labelAnswer};
 			$microAnswer += $$allLabelsAnswer{$labelAnswer};
 		}
 	}
@@ -374,8 +371,8 @@ sub getShortRelName() {
         return 'adv' if ($relName eq 'advise');
         return 'eff' if ($relName eq 'effect');
         return 'mech' if ($relName eq 'mechanism');
-        return 'exist' if ($relName eq 'Exist');
-        return 'not-exist' if ($relName eq 'NotExist');
+        return 'ex' if ($relName eq 'Exist');
+        return 'n-ex' if ($relName eq 'NotExist');
 #        die "relName='$relName'" if ($relName !~ /^(.)[^\-]+\-(.)/);
 #        my $result = (defined $$hashToCheck{$relName}) ? "$1\-$2" : "*$1$2";
 #        if ($relName =~ /\(e([12])/) {
