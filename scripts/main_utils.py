@@ -108,7 +108,7 @@ def test_writer_for_perl_evaluation(relations, preds, answer_dict, answer_path):
         #print('Answer file writing done!')
         return output_filepath_gold
 
-def read_macro_f1_from_result_file(result_filepath):
+def read_macro_f1_from_result_file_semeval(result_filepath):
         '''
         Retrieve the macro F1 score from the result file that perl eval/semeval2018_task7_scorer-v1.2.pl generates
         '''
@@ -121,18 +121,48 @@ def read_macro_f1_from_result_file(result_filepath):
         result_file.close()
         return macro_f1
 
+def read_macro_f1_from_result_file_ddi(result_filepath):
+        '''
+        Retrieve the macro F1 score from the result file that perl eval/ddi_task9.2_scorer.pl generates
+        '''
+        result_file = open(result_filepath, 'r')
+        for cur_line in result_file:
+            if cur_line.startswith('<<< The 5-way evaluation with None:'):
+                        cur_line = cur_line.replace('<<< The 5-way evaluation with None: macro-averaged F1 = ','')
+                        cur_line = cur_line.replace('% >>>','')
+                        macro_f1_5way_with_none = float(cur_line)
+            if cur_line.startswith('<<< The 5-way evaluation without None:'):
+                        cur_line = cur_line.replace('<<< The 5-way evaluation without None: macro-averaged F1 = ','')
+                        cur_line = cur_line.replace('% >>>','')
+                        macro_f1_5way_without_none = float(cur_line)
+            if cur_line.startswith('<<< The 2-way evaluation (just detection of relation):'):
+                        cur_line = cur_line.replace('<<< The 2-way evaluation (just detection of relation): macro-averaged F1 = ','')
+                        cur_line = cur_line.replace('% >>>','')
+                        macro_f1_2way = float(cur_line)
+        result_file.close()
+        return macro_f1_5way_with_none, macro_f1_5way_without_none, macro_f1_2way
+
 #read the macro F1 from the necessary filepath
-def evaluate(result_filepath, answer_filepath, relation_dict, data_orin, preds):
+def evaluate(result_filepath, answer_filepath, relation_dict, data_orin, preds, dataset):
     output_filepath_gold = test_writer_for_perl_evaluation(
         data_orin, preds, relation_dict, answer_filepath
     )
+    if dataset == 'semeval2010':
+        eval_script = 'semeval2010_task8_scorer-v1.2.pl'
+    elif dataset == 'ddi':
+        eval_script = 'ddi_task9.2_scorer.pl'
     command = (
-        "perl ../eval/semeval2010_task8_scorer-v1.2.pl {0} {1} > {2}"
+        "perl ../eval/{0} {1} {2} > {3}"
         "".format(
-            answer_filepath, output_filepath_gold, result_filepath
+            eval_script, answer_filepath, output_filepath_gold, result_filepath
         )
     )
 
     os.system(command)
-    macro_f1 = read_macro_f1_from_result_file(result_filepath)
-    return macro_f1
+    if dataset == 'semeval2010':
+        macro_f1 = read_macro_f1_from_result_file_semeval(result_filepath)
+        return macro_f1
+    elif dataset == 'ddi':
+        macro_f1_5way_with_none, macro_f1_5way_without_none, macro_f1_2way = \
+                read_macro_f1_from_result_file_ddi(result_filepath)
+        return macro_f1_5way_with_none, macro_f1_5way_without_none, macro_f1_2way

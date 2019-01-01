@@ -354,6 +354,15 @@ def main():
             configProto.gpu_options.allow_growth = True
 
             with sv.managed_session(config=configProto) as session:
+                if config.dataset == 'ddi':
+                    macro_f1_print = '<macro_f1: (5way with none, 5 way without none, 2 way)>'
+                elif config.dataset == 'semeval2010':
+                    macro_f1_print = '<macro_f1>'
+                print('Format of evaluation printing is as follows')
+                print('Last epoch macro_f1 dev: {}'.format(macro_f1_print))
+                print(
+                    '<epoch>,<train accuracy>,<dev accuracy>,{}'.format(macro_f1_print)
+                )
                 if config.early_stop is True:
                     best_early_stop_macro_f1 = 0
                     best_early_stop_macro_f1_epoch_number = -1
@@ -373,17 +382,13 @@ def main():
                             session, m_eval, dev_iter, epoch, verbose=False, is_training=False
                         )
 
-                        if config.dataset == 'semeval2010':
-                            config.result_filepath = os.path.join(config.output_folder, config.result_file)
-                            config.dev_answer_filepath = os.path.join(
-                                config.output_folder, config.dev_answer_file
-                            )
+                        config.result_filepath = os.path.join(config.output_folder, config.result_file)
+                        config.dev_answer_filepath = os.path.join(
+                            config.output_folder, config.dev_answer_file
+                        )
 
-                            macro_f1_dev = main_utils.evaluate(config.result_filepath, config.dev_answer_filepath,
-                                    relation_dict, dev_data_orin, dev_preds)
-                        elif config.dataset == 'ddi':
-                            macro_f1_dev = f1_score(dev_data_orin, dev_preds, average='macro')
-                            macro_f1_dev = round(macro_f1_dev, 2)
+                        macro_f1_dev = main_utils.evaluate(config.result_filepath, config.dev_answer_filepath,
+                                relation_dict, dev_data_orin, dev_preds, config.dataset)
 
                         if config.early_stop is True:
                             early_stop_acc, early_stop_preds = run_epoch(
@@ -395,6 +400,8 @@ def main():
                             "answers_for_early_stop.txt")
                             macro_f1_early_stop = evaluate(early_stop_result_filepath,
                                     early_stop_answer_filepath, early_stop_data_orin, early_stop_preds)
+                            if config.dataset == 'ddi':
+                                macro_f1_early_stop = macro_f1_early_stop[0]
 
                         if config.cross_validate is False:
                             print('macro_f1 dev: {0}'.format(macro_f1_dev))
