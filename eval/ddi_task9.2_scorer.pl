@@ -1,0 +1,395 @@
+#!/usr/bin/perl -w
+#
+#
+#  Author: Geeticka Chauhan
+#          MIT CSAIL
+#          Preslav Nakov
+#          nakov@comp.nus.edu.sg
+#          National University of Singapore
+#
+#  WHAT: This is a scorer for DDI 2013 Extraction task 9.2 modified from the scorer of Semeval 2010 Task #8 by
+#  Preslav Nakov at National University of Singapore
+#
+#
+#  Last modified: December 28, 2018
+#
+#  Current version: 1.1
+#
+#
+#
+#  Use:
+#     ddi_task9.2_scorer-v1.1.pl <PROPOSED_ANSWERS> <ANSWER_KEY>
+#
+#  Example2:
+#     ddi_task9.2_scorer.pl proposed_answer1.txt answer_key1.txt > result_scores1.txt
+#     ddi_task9.2_scorer.pl proposed_answer2.txt answer_key2.txt > result_scores2.txt
+#     ddi_task9.2_scorer.pl proposed_answer3.txt answer_key3.txt > result_scores3.txt
+#
+#  Description:
+#     The scorer takes as input a proposed classification file and an answer key file.
+#     Both files should contain one prediction per line in the format "<SENT_ID>	<RELATION>"
+#     with a TAB as a separator, e.g.,
+#           1	int
+#           2	mechanism
+#           3	none
+#               ...
+#     The files do not have to be sorted in any way and the first file can have predictions
+#     for a subset of the IDs in the second file only, e.g., because hard examples have been skipped.
+#     Repetitions of IDs are not allowed in either of the files.
+#
+#     The scorer calculates and outputs the following statistics:
+#        (1) confusion matrix, which shows
+#           - the sums for each row/column: -SUM-
+#           - the number of skipped examples: skip
+#           - the number of examples with correct relation, but wrong directionality: xDIRx
+#           - the number of examples in the answer key file: ACTUAL ( = -SUM- + skip + xDIRx )
+#        (2) accuracy and coverage
+#        (3) precision (P), recall (R), and F1-score for each relation
+#        (4) micro-averaged P, R, F1, where the calculations ignore the Other category.
+#        (5) macro-averaged P, R, F1, where the calculations ignore the Other category.
+#
+#     Note that in scores (4) and (5), skipped examples are equivalent to those classified as Other.
+#     So are examples classified as relations that do not exist in the key file (which is probably not optimal).
+#
+#     The scoring is done three times:
+#       (i)   as a (2*9+1)-way classification
+#       (ii)  as a (9+1)-way classification, with directionality ignored
+#       (iii) as a (9+1)-way classification, with directionality taken into account.
+#     
+#     The official score is the macro-averaged F1-score for (iii).
+#
+
+use strict;
+
+
+###############
+###   I/O   ###
+###############
+
+if ($#ARGV != 1) {
+	die "Usage:\nddi_task9.2_scorer.pl <PROPOSED_ANSWERS> <ANSWER_KEY>\n";
+}
+
+my $PROPOSED_ANSWERS_FILE_NAME = $ARGV[0];
+my $ANSWER_KEYS_FILE_NAME      = $ARGV[1];
+
+
+################
+###   MAIN   ###
+################
+
+my (%confMatrix5way, %confMatrix2way) = ();
+#my (%confMatrix19way, %confMatrix10wayNoDir, %confMatrix10wayWithDir) = ();
+my (%idsProposed, %idsAnswer) = ();
+my (%allLabels5waylAnswer, %allLabels2wayAnswer) = ();
+#my (%allLabels19waylAnswer, %allLabels10wayAnswer) = ();
+my (%allLabels5wayProposed, %allLabels2wayProposed) = ();
+#my (%allLabels19wayProposed, %allLabels10wayNoDirProposed, %allLabels10wayWithDirProposed) = ();
+
+### 1. Read the file contents
+my $totalProposed = &readFileIntoHash($PROPOSED_ANSWERS_FILE_NAME, \%idsProposed);
+my $totalAnswer = &readFileIntoHash($ANSWER_KEYS_FILE_NAME, \%idsAnswer);
+
+### 2. Calculate the confusion matrices
+foreach my $id (keys %idsProposed) {
+
+	### 2.1. Unexpected IDs are not allowed
+	die "File $PROPOSED_ANSWERS_FILE_NAME contains a bad ID: '$id'"
+		if (!defined($idsAnswer{$id}));
+
+	### 2.2. Update the 5-way confusion matrix
+	my $labelProposed = $idsProposed{$id};
+	my $labelAnswer   = $idsAnswer{$id};
+	$confMatrix5way{$labelProposed}{$labelAnswer}++;
+	$allLabels5wayProposed{$labelProposed}++;
+
+        ### 2.3 Update the 2-way confusion matrix
+	my $labelProposed2way = $idsProposed{$id};
+	my $labelAnswer2way   = $idsAnswer{$id};
+        $labelProposed2way = &getrelationexistance($labelProposed2way);
+        $labelAnswer2way = &getrelationexistance($labelAnswer2way);
+	$confMatrix2way{$labelProposed2way}{$labelAnswer2way}++;
+	$allLabels2wayProposed{$labelProposed2way}++;
+
+}
+
+### 3. Calculate the ground truth distributions
+foreach my $id (keys %idsAnswer) {
+
+	### 3.1. Update the 5-way answer distribution
+	my $labelAnswer = $idsAnswer{$id};
+	$allLabels5waylAnswer{$labelAnswer}++;
+
+	### 3.2. Update the 2-way answer distribution
+	my $labelAnswer2way = $labelAnswer;
+        $labelAnswer2way = &getrelationexistance($labelAnswer2way};
+	$allLabels2wayAnswer{$labelAnswer2way}++;
+}
+
+### 4. Check for proposed classes that are not contained in the answer key file: this may happen in cross-validation
+foreach my $labelProposed (sort keys %allLabels5wayProposed) {
+	if (!defined($allLabels5waylAnswer{$labelProposed})) {
+		print "!!!WARNING!!! The proposed file contains $allLabels5wayProposed{$labelProposed} label(s) of type '$labelProposed', which is NOT present in the key file.\n\n";
+	}
+}
+
+### 4. 5-way evaluation
+print "<<< 5-WAY EVALUATION >>>:\n\n";
+my $fiveway = &evaluate(\%confMatrix5way, \%allLabels5wayProposed, \%allLabels5waylAnswer, $totalProposed, $totalAnswer, 1);
+
+print "<<< 5-WAY EVALUATION (without using None) >>>:\n\n";
+my $fiveway_notnone = &evaluate(\%confMatrix5way, \%allLabels5wayProposed, \%allLabels5waylAnswer, $totalProposed, $totalAnswer, 0);
+
+### 5. 2-way evaluation
+print "<<< 2-WAY EVALUATION >>>:\n\n";
+my $twoway = &evaluate(\%confMatrix2way, \%allLabels2way, \%allLabels2way, $totalProposed, $totalAnswer, 1);
+
+
+### 7. Output the 3 macro F1 values
+printf "<<< The 5-way evaluation with None: macro-averaged F1 = %0.2f%s >>>\n", $fiveway, '%';
+printf "<<< The 5-way evaluation without None: macro-averaged F1 = %0.2f%s >>>\n", $fiveway_notnone, '%';
+printf "<<< The 2-way evaluation (just detection of relation): macro-averaged F1 = %0.2f%s >>>\n", $twoway, '%';
+
+
+################
+###   SUBS   ###
+################
+
+sub getIDandLabel() {
+	my $line = shift;
+	return (-1,()) if ($line !~ /^([0-9]+)\t([^\r]+)\r?\n$/);
+
+	my ($id, $label) = ($1, $2);
+
+    return ($id, '_none') if ($label eq 'none');
+
+	return ($id, $label)
+    if (($label eq 'advise')       || ($label eq 'effect')       ||
+		($label eq 'mechanism')   || ($label eq 'int'));
+	
+	return (-1, ());
+}
+
+sub getrelationexistance() {
+      my ($label) = @_;
+      return 'Exist'
+    if (($label eq 'advise')       || ($label eq 'effect')       ||
+		($label eq 'mechanism')   || ($label eq 'int'));
+      return 'NotExist' if ($label eq '_none');
+      return ();
+}
+
+
+sub readFileIntoHash() {
+	my ($fname, $ids) = @_;
+	open(INPUT, $fname) or die "Failed to open $fname for text reading.\n";
+	my $lineNo = 0;
+	while (<INPUT>) {
+		$lineNo++;
+		my ($id, $label) = &getIDandLabel($_);
+		die "Bad file format on line $lineNo: '$_'\n" if ($id < 0);
+		if (defined $$ids{$id}) {
+			s/[\n\r]*$//;
+			die "Bad file format on line $lineNo (ID $id is already defined): '$_'\n";
+		}
+		$$ids{$id} = $label;
+	}
+	close(INPUT) or die "Failed to close $fname.\n";
+	return $lineNo;
+}
+
+
+sub evaluate() {
+	my ($confMatrix, $allLabelsProposed, $allLabelsAnswer, $totalProposed, $totalAnswer, $useNone) = @_;
+
+	### 0. Create a merged list for the confusion matrix
+	my @allLabels = ();
+	&mergeLabelLists($allLabelsAnswer, $allLabelsProposed, \@allLabels);
+
+	### 1. Print the confusion matrix heading
+	print "Confusion matrix:\n";
+	print "       ";
+	foreach my $label (@allLabels) {
+		printf " %4s", &getShortRelName($label, $allLabelsAnswer);
+	}
+	print " <-- classified as\n";
+	print "      +";
+	foreach my $label (@allLabels) {
+		print "-----";
+	}
+	
+	print "+ -SUM- skip ACTUAL\n";
+	
+
+	### 2. Print the rest of the confusion matrix
+	my $freqCorrect = 0;
+	my $ind = 1;
+	my $otherSkipped = 0;
+	foreach my $labelAnswer (sort keys %{$allLabelsAnswer}) {
+
+		### 2.1. Output the short relation label
+		printf " %4s |", &getShortRelName($labelAnswer, $allLabelsAnswer);
+
+		### 2.2. Output a row of the confusion matrix
+		my $sumProposed = 0;
+		foreach my $labelProposed (@allLabels) {
+			$$confMatrix{$labelProposed}{$labelAnswer} = 0
+				if (!defined($$confMatrix{$labelProposed}{$labelAnswer}));
+			printf "%4d ", $$confMatrix{$labelProposed}{$labelAnswer};
+			$sumProposed += $$confMatrix{$labelProposed}{$labelAnswer};
+		}
+
+		### 2.3. Output the horizontal sums
+		my $ans = defined($$allLabelsAnswer{$labelAnswer}) ? $$allLabelsAnswer{$labelAnswer} : 0;
+		printf "| %4d %4d %4d\n", $sumProposed, $ans - $sumProposed, $ans;
+		if ($labelAnswer eq '_none') {
+			$otherSkipped = $ans - $sumProposed;
+		}
+
+		$ind++;
+
+		$$confMatrix{$labelAnswer}{$labelAnswer} = 0
+			if (!defined($$confMatrix{$labelAnswer}{$labelAnswer}));
+		$freqCorrect += $$confMatrix{$labelAnswer}{$labelAnswer};
+	}
+	print "      +";
+	foreach (@allLabels) {
+		print "-----";
+	}
+	print "+\n";
+	
+	### 3. Print the vertical sums
+	print " -SUM- ";
+	foreach my $labelProposed (@allLabels) {
+		$$allLabelsProposed{$labelProposed} = 0
+			if (!defined $$allLabelsProposed{$labelProposed});
+		printf "%4d ", $$allLabelsProposed{$labelProposed};
+	}
+	printf "  %4d %4d %4d\n\n", $totalProposed, $totalAnswer - $totalProposed, $totalAnswer;
+
+	### 4. Output the coverage
+	my $coverage = 100.0 * $totalProposed / $totalAnswer;
+	printf "%s%d%s%d%s%5.2f%s", 'Coverage = ', $totalProposed, '/', $totalAnswer, ' = ', $coverage, "\%\n";
+
+	### 5. Output the accuracy
+	my $accuracy = 100.0 * $freqCorrect / $totalProposed;
+	printf "%s%d%s%d%s%5.2f%s", 'Accuracy (calculated for the above confusion matrix) = ', $freqCorrect, '/', $totalProposed, ' = ', $accuracy, "\%\n";
+
+	### 6. Output the accuracy considering all skipped to be wrong
+	$accuracy = 100.0 * $freqCorrect / $totalAnswer;
+	printf "%s%d%s%d%s%5.2f%s", 'Accuracy (considering all skipped examples as Wrong) = ', $freqCorrect, '/', $totalAnswer, ' = ', $accuracy, "\%\n";
+
+	### 7. Calculate accuracy with all skipped examples considered Other
+	my $accuracyWithOther = 100.0 * ($freqCorrect + $otherSkipped) / $totalAnswer;
+	printf "%s%d%s%d%s%5.2f%s", 'Accuracy (considering all skipped examples as None) = ', ($freqCorrect + $otherSkipped), '/', $totalAnswer, ' = ', $accuracyWithOther, "\%\n";
+
+	### 8. Output P, R, F1 for each relation
+	my ($macroP, $macroR, $macroF1) = (0, 0, 0);
+	my ($microCorrect, $microProposed, $microAnswer) = (0, 0, 0);
+	print "\nResults for the individual relations:\n";
+	foreach my $labelAnswer (sort keys %{$allLabelsAnswer}) {
+
+
+		### 8.1. Prevent Perl complains about unintialized values
+		if (!defined($$allLabelsProposed{$labelAnswer})) {
+			$$allLabelsProposed{$labelAnswer} = 0;
+		}
+
+		### 8.1. Calculate P/R/F1
+		my $P  = (0 == $$allLabelsProposed{$labelAnswer}) ? 0
+				: 100.0 * $$confMatrix{$labelAnswer}{$labelAnswer} / ($$allLabelsProposed{$labelAnswer} + $wrongDirectionCnt);
+		my $R  = (0 == $$allLabelsAnswer{$labelAnswer}) ? 0
+				: 100.0 * $$confMatrix{$labelAnswer}{$labelAnswer} / $$allLabelsAnswer{$labelAnswer};
+		my $F1 = (0 == $P + $R) ? 0 : 2 * $P * $R / ($P + $R);
+
+		### 8.3. Output P/R/F1
+		printf "%25s%s%4d%s%4d%s%6.2f", $labelAnswer,
+			" :    P = ", $$confMatrix{$labelAnswer}{$labelAnswer}, '/', ($$allLabelsProposed{$labelAnswer} + $wrongDirectionCnt), ' = ', $P;
+		printf"%s%4d%s%4d%s%6.2f%s%6.2f%s\n",
+		  	 "%     R = ", $$confMatrix{$labelAnswer}{$labelAnswer}, '/', $$allLabelsAnswer{$labelAnswer},   ' = ', $R,
+			 "%     F1 = ", $F1, '%';
+
+		### 8.5. Accumulate statistics for micro/macro-averaging
+		if ($useNone) {
+			$macroP  += $P;
+			$macroR  += $R;
+			$macroF1 += $F1;
+			$microCorrect += $$confMatrix{$labelAnswer}{$labelAnswer};
+			$microProposed += $$allLabelsProposed{$labelAnswer} + $wrongDirectionCnt;
+			$microAnswer += $$allLabelsAnswer{$labelAnswer};
+		}
+		elsif ($labelAnswer ne '_Other') {
+			$macroP  += $P;
+			$macroR  += $R;
+			$macroF1 += $F1;
+			$microCorrect += $$confMatrix{$labelAnswer}{$labelAnswer};
+			$microProposed += $$allLabelsProposed{$labelAnswer} + $wrongDirectionCnt;
+			$microAnswer += $$allLabelsAnswer{$labelAnswer};
+		}
+	}
+
+	### 9. Output the micro-averaged P, R, F1
+	my $microP  = (0 == $microProposed)    ? 0 : 100.0 * $microCorrect / $microProposed;
+	my $microR  = (0 == $microAnswer)      ? 0 : 100.0 * $microCorrect / $microAnswer;
+	my $microF1 = (0 == $microP + $microR) ? 0 :   2.0 * $microP * $microR / ($microP + $microR);
+	if ($useNone) {
+                print "\nMicro-averaged result :\n";
+        }
+        else {
+                print "\n Micro-averaged result (excluding None):\n";
+        }
+	printf "%s%4d%s%4d%s%6.2f%s%4d%s%4d%s%6.2f%s%6.2f%s\n",
+		      "P = ", $microCorrect, '/', $microProposed, ' = ', $microP,
+		"%     R = ", $microCorrect, '/', $microAnswer, ' = ', $microR,
+		"%     F1 = ", $microF1, '%';
+
+	### 10. Output the macro-averaged P, R, F1
+	my $distinctLabelsCnt = keys %{$allLabelsAnswer}; 
+	
+        if (!$useNone) {
+                ## -1, if '_none' exists
+	        $distinctLabelsCnt-- if (defined $$allLabelsAnswer{'_none'});
+        }
+
+	$macroP  /= $distinctLabelsCnt; # first divide by the number of categories
+	$macroR  /= $distinctLabelsCnt;
+	$macroF1 /= $distinctLabelsCnt;
+	if ($useNone) {
+                print "\nMACRO-averaged result :\n";
+        }
+        else {
+                print "\nMACRO-averaged result (excluding None):\n";
+        }
+	printf "%s%6.2f%s%6.2f%s%6.2f%s\n\n\n\n", "P = ", $macroP, "%\tR = ", $macroR, "%\tF1 = ", $macroF1, '%';
+
+	### 11. Return the official score
+	return $macroF1;
+}
+
+
+sub getShortRelName() {
+	my ($relName, $hashToCheck) = @_;
+	return '_N_' if ($relName eq '_none');
+	return 'int' if ($relName eq 'int');
+        return 'adv' if ($relName eq 'advise');
+        return 'eff' if ($relName eq 'effect');
+        return 'mech' if ($relName eq 'mechanism');
+        return 'exist' if ($relName eq 'Exist');
+        return 'not-exist' if ($relName eq 'NotExist');
+#        die "relName='$relName'" if ($relName !~ /^(.)[^\-]+\-(.)/);
+#        my $result = (defined $$hashToCheck{$relName}) ? "$1\-$2" : "*$1$2";
+#        if ($relName =~ /\(e([12])/) {
+#		$result .= $1;
+#	}
+#	return $result;
+}
+
+sub mergeLabelLists() {
+	my ($hash1, $hash2, $mergedList) = @_;
+	foreach my $key (sort keys %{$hash1}) {
+		push @{$mergedList}, $key if ($key ne 'WRONG_DIR');
+	}
+	foreach my $key (sort keys %{$hash2}) {
+		push @{$mergedList}, $key if (($key ne 'WRONG_DIR') && !defined($$hash1{$key}));
+	}
+}

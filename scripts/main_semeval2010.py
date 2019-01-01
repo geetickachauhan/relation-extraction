@@ -473,7 +473,10 @@ if __name__ == '__main__':
 
 
         if config.cross_validate is True:
-            num_folds = 10 # this value will need to be changed depending on the dataset
+            if config.dataset == 'semeval2010':
+                num_folds = 10 # this value will need to be changed depending on the dataset
+            elif config.dataset == 'ddi':
+                num_folds = 5
             for config.fold in range(0, num_folds):
                 start_time = time.time()
                 print('Fold {} Starting!'.format(config.fold))
