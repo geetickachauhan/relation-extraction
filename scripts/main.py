@@ -494,10 +494,17 @@ if __name__ == '__main__':
                 execution_time = round(execution_time, 2)
                 config.execution_time_folds.append(execution_time)
 
-            mean_macro_f1 = np.mean(config.macro_f1_folds)
-            std_macro_f1 = np.std(config.macro_f1_folds)
+            if config.dataset == 'ddi':
+                macro_f1_type_by_fold = [x for x in zip(*config.macro_f1_folds)] # 3 types of macro F1 X folds
+                mean_macro_f1 = [np.mean(x) for x in macro_f1_type_by_fold]
+                std_macro_f1 = [np.std(x) for x in macro_f1_type_by_fold]
+                print("Cross validated F1 scores: %.2f +- %.2f %.2f +- %.2f %.2f +- %.2f"%(mean_macro_f1[0], 
+                    std_macro_f1[0], mean_macro_f1[1], std_macro_f1[1], mean_macro_f1[2], std_macro_f1[2]))
+            elif config.dataset == 'semeval2010':
+                mean_macro_f1 = np.mean(config.macro_f1_folds)
+                std_macro_f1 = np.std(config.macro_f1_folds)
+                print("Cross validated F1 scores: %.2f +- %.2f"%(mean_macro_f1, std_macro_f1))
             print("All macro F1 scores", config.macro_f1_folds)
-            print("Cross validated F1 scores: %.2f +- %.2f"%(mean_macro_f1, std_macro_f1))
             print("ID of the model is", config.id)
             # code to dump the data
             result = {}
