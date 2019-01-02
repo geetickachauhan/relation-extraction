@@ -375,7 +375,7 @@ def main():
                         if config.early_stop is True:
                             early_stop_iter = data_utils.batch_iter(config.seed, main_utils.stack_data(early_stop_vec), bz, shuffle=False)
                         train_verbosity = True if config.cross_validate is False else False
-                        train_acc, _ = run_epoch(session, m_train, train_iter, epoch, verbose=train_verbosity)
+                        train_acc, _ = run_epoch(session, m_train, train_iter, epoch, verbose=False)
 
                         # TODO(geeticka): Why separate model (e.g. why m_eval vs. m_train)?
                         dev_acc, dev_preds = run_epoch(

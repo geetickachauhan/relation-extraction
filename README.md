@@ -1,4 +1,6 @@
 # relation-extraction
+How to run (from within scripts folder): python main.py --cross\_validate --dataset=ddi 
+
 Relation Extraction with Semeval 2010 data, i2b2 2010 VA challenge classification data and DDI extraction data.
 
 For Semeval 2010 task 8, evaluation is done based on macro F1 of all classes but not considering "Other"
