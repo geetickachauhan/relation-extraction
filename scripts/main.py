@@ -398,8 +398,9 @@ def main():
                                     "result-earlystop.txt")
                             early_stop_answer_filepath = os.path.join(config.output_folder,
                             "answers_for_early_stop.txt")
-                            macro_f1_early_stop = evaluate(early_stop_result_filepath,
-                                    early_stop_answer_filepath, early_stop_data_orin, early_stop_preds)
+                            macro_f1_early_stop = main_utils.evaluate(early_stop_result_filepath,
+                                    early_stop_answer_filepath, relation_dict, early_stop_data_orin, 
+                                    early_stop_preds, config.dataset)
                             if config.dataset == 'ddi':
                                 macro_f1_early_stop = macro_f1_early_stop[0]
 
