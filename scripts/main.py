@@ -72,7 +72,8 @@ def prediction(scores):
     for idx in range(data_size):
         data_line = scores[idx]
         if all(data_line <= 0.): # assigning last class which is none or other
-            pred[idx] = config.classnum if config.dataset == 'semeval2010' or config.dataset == 'ddi'
+            if config.dataset == 'semeval2010' or config.dataset == 'ddi':
+                pred[idx] = config.classnum 
         else:
             pred[idx] = np.argmax(data_line)
 
