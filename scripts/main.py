@@ -41,7 +41,7 @@ if config.dataset == 'semeval2010':
     #TODO (geeticka): remove all arguments from config that are not passed in, for example folds and macro_f1_folds etc
 elif config.dataset == 'ddi':
     relation_dict = {0: 'advise', 1: 'effect', 2: 'mechanism', 3: 'int', 4: 'none'}
-    config.classnum = max(relation_dict.keys()) + 1 # 5 classes are being predicted
+    config.classnum = max(relation_dict.keys()) # 4 classes are being predicted
     #TODO (geeticka): change this based on drugbank, medline specific testing 
     config.data_root = "/data/medg/misc/semeval_2010/medical-data/DDICorpus/pre-processed/extraction/"
     config.embedding_file = '/data/medg/misc/semeval_2010/medical-data/wikipedia-pubmed-and-PMC-w2v.txt'
@@ -71,12 +71,9 @@ def prediction(scores):
     pred = np.zeros(data_size)
     for idx in range(data_size):
         data_line = scores[idx]
-        if config.dataset == 'semeval2010':
-            if all(data_line <= 0.):
-                pred[idx] = 18
-            else:
-                pred[idx] = np.argmax(data_line)
-        elif config.dataset == 'ddi':
+        if all(data_line <= 0.): # assigning last class which is none or other
+            pred[idx] = config.classnum if config.dataset == 'semeval2010' or config.dataset == 'ddi'
+        else:
             pred[idx] = np.argmax(data_line)
 
     return pred
