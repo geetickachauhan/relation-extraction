@@ -519,6 +519,8 @@ if __name__ == '__main__':
             config.final_result_folder = os.path.join(config.output_dir, 'Final_Result')
             main_utils.create_folder_if_not_exists(config.final_result_folder)
             final_result_path = os.path.join(config.final_result_folder, 'final_result.csv')
+            if config.hyperparam_tuning_mode is True:
+                final_result_path = os.path.join(config.final_result_folder, 'final_result_hyperparam.csv')
             # need to change the format in which this is written
             # 1 column for fold #, dictionary with all the hyperparam details, and the last column for the result of the fold.
             if(os.path.exists(final_result_path)):
