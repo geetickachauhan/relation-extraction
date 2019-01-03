@@ -234,13 +234,9 @@ def init():
     # Build vocab, pretend that your test set does not exist because when you need to use test 
     # set, you can just make sure that what we report on (i.e. dev set here) is actually the test data
     all_data = train_data[0] + dev_data[0]
-    if config.early_stop is False:
-        early_stop_data = dev_data
-    #TODO: (geeticka) improve the above; handle the situation when the early stop data is non existant
-    early_stop_data_addition = early_stop_data[0]
 
     if config.early_stop is True:
-        all_data = all_data + early_stop_data_addition
+        all_data = all_data + early_stop_data[0]
     word_dict = data_utils.build_dict(all_data, config.remove_stop_words, config.low_freq_thresh)
     logging.info('total words: %d' % len(word_dict))
 
