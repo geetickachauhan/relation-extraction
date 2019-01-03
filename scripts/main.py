@@ -507,6 +507,8 @@ if __name__ == '__main__':
                 print("Cross validated F1 scores: %.2f +- %.2f"%(mean_macro_f1, std_macro_f1))
             print("All macro F1 scores", config.macro_f1_folds)
             print("ID of the model is", config.id)
+            total_execution_time = sum(config.execution_time_folds)
+            print("Execution Time (hr)", total_execution_time)
             # code to dump the data
             result = {}
             parameters, _ = parser.get_results_dict(config, 0) # we don't care about second val and we also don't care about individual training time here
@@ -555,4 +557,5 @@ if __name__ == '__main__':
                     main()
             end_time = time.time()
             execution_time = (end_time - start_time)/3600.0
+            print("ID of the model is", config.id)
             print("Execution time (in hr): ", execution_time)
