@@ -404,7 +404,7 @@ def main():
                                 macro_f1_early_stop = macro_f1_early_stop[0]
 
                         if config.cross_validate is False:
-                            print('macro_f1 {}: {0}'.format(dev_or_test, macro_f1_dev))
+                            print('macro_f1 {0}: {1}'.format(dev_or_test, macro_f1_dev))
                             print('{0},{1:.2f},{2:.2f},{3}'.format(epoch + 1, train_acc*100, dev_acc*100,
                                 macro_f1_dev))
 
@@ -432,7 +432,7 @@ def main():
                                 config.macro_f1_folds.append(macro_f1_dev)
 
                                 if config.cross_validate is True:
-                                    print('Last epoch macro_f1 {}: {0}'.format(dev_or_test, macro_f1_dev))
+                                    print('Last epoch macro_f1 {0}: {1}'.format(dev_or_test, macro_f1_dev))
                                     print('{0},{1:.2f},{2:.2f},{3}'.format(epoch+1, train_acc*100,
                                         dev_acc*100, macro_f1_dev))
                                 break
@@ -440,7 +440,7 @@ def main():
                         if epoch == config.num_epoches - 1:
                             config.macro_f1_folds.append(macro_f1_dev)
                             if config.cross_validate is True:
-                                print('Last epoch macro_f1 {}: {0}'.format(dev_or_test, macro_f1_dev))
+                                print('Last epoch macro_f1 {0}: {1}'.format(dev_or_test, macro_f1_dev))
                                 print(
                                     '{0},{1:.2f},{2:.2f},{3}'.format(
                                         epoch+1, train_acc*100, dev_acc*100, macro_f1_dev
