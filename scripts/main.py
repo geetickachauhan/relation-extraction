@@ -359,7 +359,8 @@ def main():
                 elif config.dataset == 'semeval2010':
                     macro_f1_print = '<macro_f1>'
                 print('Format of evaluation printing is as follows')
-                print('Last epoch macro_f1 dev: {}'.format(macro_f1_print))
+                dev_or_test = 'dev' if config.use_test is False else 'test'
+                print('Last epoch macro_f1 {}: {}'.format(dev_or_test, macro_f1_print))
                 print(
                     '<epoch>,<train accuracy>,<dev accuracy>,{}'.format(macro_f1_print)
                 )
@@ -405,7 +406,7 @@ def main():
                                 macro_f1_early_stop = macro_f1_early_stop[0]
 
                         if config.cross_validate is False:
-                            print('macro_f1 dev: {0}'.format(macro_f1_dev))
+                            print('macro_f1 {}: {0}'.format(dev_or_test, macro_f1_dev))
                             print('{0},{1:.2f},{2:.2f},{3}'.format(epoch + 1, train_acc*100, dev_acc*100,
                                 macro_f1_dev))
 
@@ -417,7 +418,7 @@ def main():
                                 patience_counter = 0
 
                         # Recording epoch information
-                        results['epoch'][epoch]['dev'] = {'f1_macro': macro_f1_dev, 'accuracy': dev_acc}
+                        results['epoch'][epoch][dev_or_test] = {'f1_macro': macro_f1_dev, 'accuracy': dev_acc}
                         results['epoch'][epoch]['train'] = {'accuracy': train_acc}
 
                         if config.early_stop is True:
@@ -427,13 +428,13 @@ def main():
                                 results['execution_details']['early_stop'] = True
                                 results['epoch'][epoch]['early_stop'] = {'f1_macro': macro_f1_early_stop,
                                         'accuracy': early_stop_acc}
-                                results['epoch'][epoch]['dev'] = {'f1_macro': macro_f1_dev, 'accuracy':
+                                results['epoch'][epoch][dev_or_test] = {'f1_macro': macro_f1_dev, 'accuracy':
                                         dev_acc}
                                 results['epoch'][epoch]['train'] = {'accuracy': train_acc}
                                 config.macro_f1_folds.append(macro_f1_dev)
 
                                 if config.cross_validate is True:
-                                    print('Last epoch macro_f1 dev: {0}'.format(macro_f1_dev))
+                                    print('Last epoch macro_f1 {}: {0}'.format(dev_or_test, macro_f1_dev))
                                     print('{0},{1:.2f},{2:.2f},{3}'.format(epoch+1, train_acc*100,
                                         dev_acc*100, macro_f1_dev))
                                 break
@@ -441,7 +442,7 @@ def main():
                         if epoch == config.num_epoches - 1:
                             config.macro_f1_folds.append(macro_f1_dev)
                             if config.cross_validate is True:
-                                print('Last epoch macro_f1 dev: {0}'.format(macro_f1_dev))
+                                print('Last epoch macro_f1 {}: {0}'.format(dev_or_test, macro_f1_dev))
                                 print(
                                     '{0},{1:.2f},{2:.2f},{3}'.format(
                                         epoch+1, train_acc*100, dev_acc*100, macro_f1_dev
