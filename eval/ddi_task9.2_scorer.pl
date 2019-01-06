@@ -315,7 +315,7 @@ sub evaluate() {
 			$microProposed += $$allLabelsProposed{$labelAnswer};
 			$microAnswer += $$allLabelsAnswer{$labelAnswer};
 		}
-		elsif ($labelAnswer ne '_Other') {
+		elsif ($labelAnswer ne '_none') {
 			$macroP  += $P;
 			$macroR  += $R;
 			$macroF1 += $F1;

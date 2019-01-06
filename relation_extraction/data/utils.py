@@ -67,6 +67,9 @@ def per_sentence_replacement_ddi(sentence, entity_positions):
    
     entity_positions[0] = new_e0_pos
     diff = e0_pos[1] - e0_pos[0] # if the entity is 2 word, then move every other e_pos down by 1
+    if entity_positions[0] == entity_positions[1]: # if both entities are the same
+        entity_positions[1] = new_e0_pos
+        return sentence, entity_positions
     if diff > 0:
         for i in range(1, len(entity_positions)):
             e_pos = entity_positions[i]
@@ -281,8 +284,6 @@ def vectorize(config, data, word_dict):
     local_max_e1_len = max(list(map(lambda x: x[1]-x[0]+1, e1_pos)))
     local_max_e2_len = max(list(map(lambda x: x[1]-x[0]+1, e2_pos)))
     print('max sen len: {}, local max e1 len: {}, local max e2 len: {}'.format(max_sen_len, local_max_e1_len, local_max_e2_len))
-    print('max e1 len: {}, max e2 len: {}'.format(max_e1_len, max_e2_len))
-    print('amount of data', num_data, len(relations), len(e1_pos), len(e2_pos))
     # maximum values needed to decide the dimensionality of the vector
     sents_vec = np.zeros((num_data, max_sen_len), dtype=int)
     e1_vec = np.zeros((num_data, max_e1_len), dtype=int)
@@ -307,9 +308,6 @@ def vectorize(config, data, word_dict):
 
         for ii in range(max_e2_len):
             if ii < (pos2[1]-pos2[0]+1):
-                    print('sent len', len(sent))
-                    print('pos0, pos1', pos2[0], pos2[1])
-                    print(vec[range(pos2[0], pos2[1]+1)[ii]])
                     e2_vec[idx, ii] = vec[range(pos2[0], pos2[1]+1)[ii]]
             else:
                     e2_vec[idx, ii] = vec[pos2[-1]]
