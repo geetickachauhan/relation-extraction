@@ -53,15 +53,17 @@ TRAIN, DEV, TEST = 0, 1, 2
 if config.dataset == 'semeval2010':
     folds = 10
     middle = '-dep-dir'
+    post = ''
 elif config.dataset == 'ddi':
     folds = 5
     middle = ''
+    post = '_filtered' # pre-processing method 1 with negative instance filtering for same entities
 
 dataset = \
-data_utils.Dataset(res('pickled-files/seed_{K}_{folds}{middle}-fold-border_{N}.pkl').format(K=config.pickle_seed,
-    N=config.border_size, middle=middle, folds=folds))
-print("pickled files:", res('pickled-files/seed_{K}_{folds}{middle}-fold-border_{N}.pkl').format(K=config.pickle_seed,
-    N=config.border_size, middle=middle, folds=folds))
+data_utils.Dataset(res('pickled-files/seed_{K}_{folds}{middle}-fold-border_{N}{post}.pkl').format(K=config.pickle_seed,
+    N=config.border_size, middle=middle, folds=folds, post=post))
+print("pickled files:", res('pickled-files/seed_{K}_{folds}{middle}-fold-border_{N}{post}.pkl').format(K=config.pickle_seed,
+    N=config.border_size, middle=middle, folds=folds, post=post))
 
 date_of_experiment_start = None
 
@@ -178,8 +180,8 @@ def init():
     else:
         train_data = dataset.get_data_for_fold(config.fold)
         dev_data = dataset.get_data_for_fold(config.fold, DEV)
-        #train_data = data_utils.replace_by_drug_ddi(train_data)
-        #dev_data = data_utils.replace_by_drug_ddi(dev_data)
+        train_data = data_utils.replace_by_drug_ddi(train_data)
+        dev_data = data_utils.replace_by_drug_ddi(dev_data)
         #TODO (geeticka) insert method to change the e1 and e2 here
 
     # now each of the above data contains the following in order:
@@ -203,11 +205,11 @@ def init():
         # split data
         train_data = main_utils.preprocess_data_noncrossvalidated(train_data, config.border_size)
         dev_data = main_utils.preprocess_data_noncrossvalidated(dev_data, config.border_size)
-        #train_data = data_utils.replace_by_drug_ddi(train_data)
-        #dev_data = data_utils.replace_by_drug_ddi(dev_data)
+        train_data = data_utils.replace_by_drug_ddi(train_data)
+        dev_data = data_utils.replace_by_drug_ddi(dev_data)
         if config.use_test is False and config.early_stop is True:
             early_stop_data = main_utils.preprocess_data_noncrossvalidated(early_stop_data, config.border_size)
-            #early_stop_data = data_utils.replace_by_drug_ddi(early_stop_data)
+            early_stop_data = data_utils.replace_by_drug_ddi(early_stop_data)
         elif config.use_test is True and config.early_stop is True:
             raise NotImplementedError('You cannot do early stopping when using test set.')
 
