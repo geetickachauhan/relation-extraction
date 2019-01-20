@@ -49,10 +49,10 @@ def create_positions_dict(metadata):
     for pos in e2['charOffset']:
         if pos not in position_dict:
             position_dict[pos] = 'OTHERDRUG'
-    for other_ent in other_entities:
-        for pos in other_ent['charOffset']:
-            if pos not in position_dict:
-                position_dict[pos] = 'UNRELATEDDRUG'
+    #for other_ent in other_entities:
+    #    for pos in other_ent['charOffset']:
+    #        if pos not in position_dict:
+    #            position_dict[pos] = 'UNRELATEDDRUG'
     return position_dict
 
 #given string 12-30, return 12, 30 as a tuple of ints
@@ -158,7 +158,7 @@ def get_other_entities(entity_dict, e1, e2):
     blacklisted_set = [e1, e2]
     return [value for key, value in entity_dict.items() if key not in blacklisted_set]
 
-def get_dataset_dataframe(directory=None, relation_extraction=False):
+def get_dataset_dataframe(directory=None, relation_extraction=True):
     '''
     If relation_extraction is True, then we don't care whether the ddi flag is true or false
     '''

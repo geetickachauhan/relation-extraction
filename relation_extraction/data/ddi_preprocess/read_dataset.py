@@ -119,7 +119,7 @@ def get_entity_number(row):
         idx_sent += 1
     return e1_limit, e2_limit
 
-def get_dataset_dataframe(directory=None, relation_extraction=False):
+def get_dataset_dataframe(directory=None, relation_extraction=True):
     '''
     If relation_extraction is True, then we don't care whether the ddi flag is true or false
     '''

@@ -43,7 +43,7 @@ elif config.dataset == 'ddi':
     relation_dict = {0: 'advise', 1: 'effect', 2: 'mechanism', 3: 'int', 4: 'none'}
     config.classnum = max(relation_dict.keys()) # 4 classes are being predicted
     #TODO (geeticka): change this based on drugbank, medline specific testing 
-    config.data_root = "/data/medg/misc/semeval_2010/medical-data/DDICorpus/pre-processed/extraction/"
+    config.data_root = "/data/medg/misc/semeval_2010/medical-data/DDICorpus/pre-processed2/extraction/"
     config.embedding_file = '/data/medg/misc/semeval_2010/medical-data/wikipedia-pubmed-and-PMC-w2v.txt'
 
 def res(path): return os.path.join(config.data_root, path)
@@ -57,7 +57,7 @@ if config.dataset == 'semeval2010':
 elif config.dataset == 'ddi':
     folds = 5
     middle = ''
-    post = '_filtered' # pre-processing method 1 with negative instance filtering for same entities
+    post = '_partialdrugblinding' # pre-processing method 1 with negative instance filtering for same entities
     config.train_text_dataset_path = 'train{post}.txt'.format(post=post)
     config.test_text_dataset_path = 'test{post}.txt'.format(post=post)
     #TODO (geeticka) remove above, use the unfiltered data
