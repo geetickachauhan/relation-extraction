@@ -32,12 +32,12 @@ def get_entity_start_and_end(entity_start, entity_end, tokens):
     e_start = tokens.index(entity_start)
     e_end = tokens.index(entity_end) - 2 # because 2 tags will be eliminated
     tokens = [x for x in tokens if x != entity_start and x != entity_end]
-    return (e_start, e_end), tokens
+    return [(e_start, e_end)], tokens
 
 # given the entity starting and ending word index, and entity replacement dictionary, 
 # update the dictionary to inform of the replace_by string for eg ENTITY
 def get_entity_replacement_dictionary(e_idx, entity_replacement, replace_by):
-    key = str(e_idx[0]) + ":" + str(e_idx[1])
+    key = str(e_idx[0][0]) + ":" + str(e_idx[0][1])
     entity_replacement[key] = replace_by
     return entity_replacement
 
@@ -91,8 +91,8 @@ def get_dataset_dataframe(directory):
                 e2_idx, tokens = get_entity_start_and_end('ENTITYOTHERSTART', 'ENTITYOTHEREND', tokens)
                 e1_idx, tokens = get_entity_start_and_end('ENTITYSTART', 'ENTITYEND', tokens)
 
-            e1 = str(" ".join(tokens[e1_idx[0] : e1_idx[1] + 1]).strip())
-            e2 = str(" ".join(tokens[e2_idx[0] : e2_idx[1] + 1]).strip())
+            e1 = str(" ".join(tokens[e1_idx[0][0] : e1_idx[0][1] + 1]).strip())
+            e2 = str(" ".join(tokens[e2_idx[0][0] : e2_idx[0][1] + 1]).strip())
             
             entity_replacement = {}
             entity_replacement = get_entity_replacement_dictionary(e1_idx, entity_replacement, 'ENTITY')
@@ -158,8 +158,8 @@ def write_into_txt(df, directory):
             row = df.iloc[i]
             relation = rev_relation_dict[row.relation_type]
             metadata = row.metadata
-            e1 = metadata['e1']['word_index']
-            e2 = metadata['e2']['word_index']
+            e1 = metadata['e1']['word_index'][0]
+            e2 = metadata['e2']['word_index'][0]
             tokenized_sentence = row.tokenized_sentence
             outfile.write(str(relation) + " " + str(e1[0]) + " " + str(e1[-1]) + " " + 
                           str(e2[0]) + " " + str(e2[-1]) + " " + tokenized_sentence + "\n")
