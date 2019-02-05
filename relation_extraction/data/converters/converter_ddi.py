@@ -243,28 +243,6 @@ def check_equality_of_written_and_read_df(df, df_copy):
     for idx in range(len(df)):
         row1 = df.iloc[idx]
         row2 = df_copy.iloc[idx]
-        #if row1['original_sentence'] != row2['original_sentence']:
-        #    print("Original sentence differs")
-        #    bool_every_column = False
-        #    print(row1, row2)
-        #if row1['e1'] != row2['e1']:
-        #    print("E1 differs")
-        #    bool_every_column = False
-        #    print(row1, row2)
-        #if row1['relation_type'] != row2['relation_type']:
-        #    print("Relation type differs")
-        #    bool_every_column = False
-        #    print(row1, row2)
-        #if row1['tokenized_sentence'] != row2['tokenized_sentence']:
-        #    print("tokenized sentence differs")
-        #    bool_every_column = False
-        #    print(row1, row2)
-        #if row1['metadata'] != row2['metadata']:
-        #    print("metadata differs")
-        #    bool_every_column = False
-        #    print(row1, row2)
-        #if bool_every_column == False:
-        #    break
         if row1['original_sentence'] != row2['original_sentence'] or row1['e1'] != row2['e1'] or \
                 row1['relation_type'] != row2['relation_type'] or \
                 row1['tokenized_sentence'] != row2['tokenized_sentence'] or \
