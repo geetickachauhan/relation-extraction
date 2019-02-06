@@ -3,9 +3,6 @@
 #
 #  Author: Geeticka Chauhan
 #          MIT CSAIL
-#          Preslav Nakov
-#          nakov@comp.nus.edu.sg
-#          National University of Singapore
 #
 #  WHAT: This is a scorer for DDI 2013 Extraction task 9.2 modified from the scorer of Semeval 2010 Task #8 by
 #  Preslav Nakov at National University of Singapore
