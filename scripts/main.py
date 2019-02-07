@@ -396,7 +396,7 @@ def main():
                             macro_f1_early_stop = main_utils.evaluate(early_stop_result_filepath,
                                     early_stop_answer_filepath, relation_dict, early_stop_data_orin, 
                                     early_stop_preds, config.dataset)
-                            if config.dataset == 'ddi':
+                            if config.dataset == 'ddi' or config.dataset == 'i2b2': # because eval is a tuple
                                 macro_f1_early_stop = macro_f1_early_stop[0]
 
                         if config.cross_validate is False:
