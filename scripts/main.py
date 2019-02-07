@@ -33,23 +33,14 @@ config = parser.get_config()
 
 
 if config.dataset == 'semeval2010':
-#    relation_dict = {0:'Component-Whole(e2,e1)', 1:'Instrument-Agency(e2,e1)', 2:'Member-Collection(e1,e2)',
-#    3:'Cause-Effect(e2,e1)', 4:'Entity-Destination(e1,e2)', 5:'Content-Container(e1,e2)',
-#    6:'Message-Topic(e1,e2)', 7:'Product-Producer(e2,e1)', 8:'Member-Collection(e2,e1)',
-#    9:'Entity-Origin(e1,e2)', 10:'Cause-Effect(e1,e2)', 11:'Component-Whole(e1,e2)',
-#    12:'Message-Topic(e2,e1)', 13:'Product-Producer(e1,e2)', 14:'Entity-Origin(e2,e1)',
-#    15:'Content-Container(e2,e1)', 16:'Instrument-Agency(e1,e2)', 17:'Entity-Destination(e2,e1)',
-#    18:'Other'}
     relation_dict = semeval_relation_dict
     config.classnum = max(relation_dict.keys()) # we are not considering the "other" class.
     folds = 10
     post = '_original' # this is determined by the preprocessing technique
     #TODO (geeticka): remove all arguments from config that are not passed in, for example folds and macro_f1_folds etc
 elif config.dataset == 'ddi':
-#    relation_dict = {0: 'advise', 1: 'effect', 2: 'mechanism', 3: 'int', 4: 'none'}
     relation_dict = ddi_relation_dict
     config.classnum = max(relation_dict.keys()) # 4 classes are being predicted
-    #TODO (geeticka): change this based on drugbank, medline specific testing 
     config.data_root = "/data/medg/misc/geeticka/relation_extraction/ddi/pre-processed/original/"
     config.embedding_file = '/data/medg/misc/geeticka/relation_extraction/biomed-embed/wikipedia-pubmed-and-PMC-w2v.txt'
     folds = 5
@@ -154,16 +145,6 @@ def run_epoch(session, model, batch_iter, epoch, verbose=True, is_training=True)
 
     return acc_count / (tot_data), preds
 
-
-# this is the split dataset just for the train data
-#above is the dataset containing the splitted information along with the dependency paths
-
-# vectorize will have different sizes for train and test depending on whether the data is truncated to
-# not include the paths as a different column
-
-
-
-
 def init():
 
     #
@@ -224,8 +205,6 @@ def init():
         elif config.use_test is True and config.early_stop is True:
             raise NotImplementedError('You cannot do early stopping when using test set.')
 
-    # if you are using the pickle file with everything split up and dependency information
-    # stored, do the following:
     # only need below if doing early stop
     if config.early_stop is True and config.cross_validate is True:
         early_stop_size = int(len(train_data[0])*config.early_stop_size)
@@ -508,6 +487,7 @@ if __name__ == '__main__':
                 execution_time = round(execution_time, 2)
                 config.execution_time_folds.append(execution_time)
 
+            #TODO: handling of below can be better: just make it automatic rather than dataset specific
             if config.dataset == 'ddi':
                 macro_f1_type_by_fold = [x for x in zip(*config.macro_f1_folds)] # 3 types of macro F1 X folds
                 mean_macro_f1 = [np.mean(x) for x in macro_f1_type_by_fold]
@@ -518,6 +498,14 @@ if __name__ == '__main__':
                 mean_macro_f1 = np.mean(config.macro_f1_folds)
                 std_macro_f1 = np.std(config.macro_f1_folds)
                 print("Cross validated F1 scores: %.2f +- %.2f"%(mean_macro_f1, std_macro_f1))
+            elif config.dataset == 'i2b2':
+                macro_f1_type_by_fold = [x for x in zip(*config.macro_f1_folds)]
+                mean_macro_f1 = [np.mean(x) for x in macro_f1_type_by_fold]
+                std_macro_f1 = [np.std(x) for x in macro_f1_type_by_fold]
+                print("Cross validated F1 scores: %.2f +- %.2f %.2f +- %.2f %.2f +- %.2f %.2f +- %.2f"%(mean_macro_f1[0], 
+                    std_macro_f1[0], mean_macro_f1[1], std_macro_f1[1], mean_macro_f1[2], std_macro_f1[2], 
+                    mean_macro_f1[3], std_macro_f1[3]))
+
             print("All macro F1 scores", config.macro_f1_folds)
             print("ID of the model is", config.id)
             total_execution_time = sum(config.execution_time_folds)
