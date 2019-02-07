@@ -13,6 +13,9 @@ import uuid # for generating a unique id for the cnn
 import pandas as pd 
 
 import relation_extraction.data.utils as data_utils
+from relation_extraction.data.converters.converter_ddi import relation_dict as ddi_relation_dict
+from relation_extraction.data.converters.converter_i2b2 import relation_dict as i2b2_relation_dict
+from relation_extraction.data.converters.converter_semeval2010 import relation_dict as semeval_relation_dict
 import main_utils
 #import argparse
 from relation_extraction.models.model import Model
@@ -30,43 +33,48 @@ config = parser.get_config()
 
 
 if config.dataset == 'semeval2010':
-    relation_dict = {0:'Component-Whole(e2,e1)', 1:'Instrument-Agency(e2,e1)', 2:'Member-Collection(e1,e2)',
-    3:'Cause-Effect(e2,e1)', 4:'Entity-Destination(e1,e2)', 5:'Content-Container(e1,e2)',
-    6:'Message-Topic(e1,e2)', 7:'Product-Producer(e2,e1)', 8:'Member-Collection(e2,e1)',
-    9:'Entity-Origin(e1,e2)', 10:'Cause-Effect(e1,e2)', 11:'Component-Whole(e1,e2)',
-    12:'Message-Topic(e2,e1)', 13:'Product-Producer(e1,e2)', 14:'Entity-Origin(e2,e1)',
-    15:'Content-Container(e2,e1)', 16:'Instrument-Agency(e1,e2)', 17:'Entity-Destination(e2,e1)',
-    18:'Other'}
+#    relation_dict = {0:'Component-Whole(e2,e1)', 1:'Instrument-Agency(e2,e1)', 2:'Member-Collection(e1,e2)',
+#    3:'Cause-Effect(e2,e1)', 4:'Entity-Destination(e1,e2)', 5:'Content-Container(e1,e2)',
+#    6:'Message-Topic(e1,e2)', 7:'Product-Producer(e2,e1)', 8:'Member-Collection(e2,e1)',
+#    9:'Entity-Origin(e1,e2)', 10:'Cause-Effect(e1,e2)', 11:'Component-Whole(e1,e2)',
+#    12:'Message-Topic(e2,e1)', 13:'Product-Producer(e1,e2)', 14:'Entity-Origin(e2,e1)',
+#    15:'Content-Container(e2,e1)', 16:'Instrument-Agency(e1,e2)', 17:'Entity-Destination(e2,e1)',
+#    18:'Other'}
+    relation_dict = semeval_relation_dict
     config.classnum = max(relation_dict.keys()) # we are not considering the "other" class.
+    folds = 10
+    post = '_original' # this is determined by the preprocessing technique
     #TODO (geeticka): remove all arguments from config that are not passed in, for example folds and macro_f1_folds etc
 elif config.dataset == 'ddi':
-    relation_dict = {0: 'advise', 1: 'effect', 2: 'mechanism', 3: 'int', 4: 'none'}
+#    relation_dict = {0: 'advise', 1: 'effect', 2: 'mechanism', 3: 'int', 4: 'none'}
+    relation_dict = ddi_relation_dict
     config.classnum = max(relation_dict.keys()) # 4 classes are being predicted
     #TODO (geeticka): change this based on drugbank, medline specific testing 
-    config.data_root = "/data/medg/misc/semeval_2010/medical-data/DDICorpus/pre-processed2/extraction/"
-    config.embedding_file = '/data/medg/misc/semeval_2010/medical-data/wikipedia-pubmed-and-PMC-w2v.txt'
+    config.data_root = "/data/medg/misc/geeticka/relation_extraction/ddi/pre-processed/original/"
+    config.embedding_file = '/data/medg/misc/geeticka/relation_extraction/biomed-embed/wikipedia-pubmed-and-PMC-w2v.txt'
+    folds = 5
+    post = '_original' # pre-processing method 1 with negative instance filtering for same entities
+elif config.dataset == 'i2b2':
+    relation_dict = i2b2_relation_dict
+    config.classnum = max(relation_dict.keys()) + 1 # we do not have an 'other' class here
+    config.data_root = "/data/medg/misc/geeticka/relation_extraction/i2b2/pre-processed/original/"
+    config.embedding_file = '/data/medg/misc/geeticka/relation_extraction/biomed-embed/wikipedia-pubmed-and-PMC-w2v.txt'
+    #TODO: insert folds information; for now just have dummy folds
+    folds = 5
+    post = '_original' 
 
+
+config.train_text_dataset_path = 'train{post}.txt'.format(post=post)
+config.test_text_dataset_path = 'test{post}.txt'.format(post=post)
 def res(path): return os.path.join(config.data_root, path)
 
 TRAIN, DEV, TEST = 0, 1, 2
-#TODO: (geeticka) when you read the dependency paths with labels, use get_only_words
-if config.dataset == 'semeval2010':
-    folds = 10
-    middle = '-dep-dir'
-    post = ''
-elif config.dataset == 'ddi':
-    folds = 5
-    middle = ''
-    post = '_partialdrugblinding' # pre-processing method 1 with negative instance filtering for same entities
-    config.train_text_dataset_path = 'train{post}.txt'.format(post=post)
-    config.test_text_dataset_path = 'test{post}.txt'.format(post=post)
-    #TODO (geeticka) remove above, use the unfiltered data
 
 dataset = \
-data_utils.Dataset(res('pickled-files/seed_{K}_{folds}{middle}-fold-border_{N}{post}.pkl').format(K=config.pickle_seed,
-    N=config.border_size, middle=middle, folds=folds, post=post))
-print("pickled files:", res('pickled-files/seed_{K}_{folds}{middle}-fold-border_{N}{post}.pkl').format(K=config.pickle_seed,
-    N=config.border_size, middle=middle, folds=folds, post=post))
+data_utils.Dataset(res('pickled-files/seed_{K}_{folds}-fold-border_{N}{post}.pkl').format(K=config.pickle_seed,
+    N=config.border_size, folds=folds, post=post))
+print("pickled files:", res('pickled-files/seed_{K}_{folds}-fold-border_{N}{post}.pkl').format(K=config.pickle_seed,
+    N=config.border_size, folds=folds, post=post))
 
 date_of_experiment_start = None
 
@@ -79,7 +87,7 @@ def prediction(scores):
         if all(data_line <= 0.): # assigning last class which is none or other
             if config.dataset == 'semeval2010' or config.dataset == 'ddi':
                 pred[idx] = config.classnum 
-        else:
+        else: # for the i2b2 data, it will do argmax
             pred[idx] = np.argmax(data_line)
 
     return pred
@@ -253,7 +261,7 @@ def init():
 
     if config.dataset == 'semeval2010':
         embeddings = data_utils.load_embedding_senna(config, word_dict)
-    elif config.dataset == 'ddi':
+    elif config.dataset == 'ddi' or config.dataset == 'i2b2':
         embeddings = data_utils.load_embedding(config, word_dict)
 
     config.max_len = main_utils.max_length_all_data(train_data[0], dev_data[0], 'sentence')
@@ -363,6 +371,8 @@ def main():
                     macro_f1_print = '<macro_f1: (5way with none, 5 way without none, 2 way)>'
                 elif config.dataset == 'semeval2010':
                     macro_f1_print = '<macro_f1>'
+                elif config.dataset == 'i2b2':
+                    macro_f1_print = '<micro_f1: (8way, Prob-Treat, Prob-Test, Prob-Prob)>'
                 print('Format of evaluation printing is as follows')
                 dev_or_test = 'dev' if config.use_test is False else 'test'
                 print('Last epoch macro_f1 {}: {}'.format(dev_or_test, macro_f1_print))
@@ -487,10 +497,8 @@ if __name__ == '__main__':
 
 
         if config.cross_validate is True:
-            if config.dataset == 'semeval2010':
-                num_folds = 10 # this value will need to be changed depending on the dataset
-            elif config.dataset == 'ddi':
-                num_folds = 5
+            num_folds = folds
+            #TODO: insert fold information about i2b2 data here
             for config.fold in range(0, num_folds):
                 start_time = time.time()
                 print('Fold {} Starting!'.format(config.fold))

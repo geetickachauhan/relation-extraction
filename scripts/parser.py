@@ -74,15 +74,16 @@ parser.add_argument('--sgd_momentum', default=False, action='store_true', \
 # Misc arguments
 parser.add_argument('--save_path', default=None,
                                                 help='save model here')
-parser.add_argument('--embedding_file', default='/data/medg/misc/semeval_2010/senna/embeddings.txt',
+parser.add_argument('--embedding_file', default='/data/medg/misc/geeticka/relation_extraction/senna/embeddings.txt',
                                                 help='embedding file')
-parser.add_argument('--embedding_vocab', default='/data/medg/misc/semeval_2010/senna/words.lst',
+parser.add_argument('--embedding_vocab', default='/data/medg/misc/geeticka/relation_extraction/senna/words.lst',
                                                 help='embedding vocab file')
-parser.add_argument('--data_root', default="/data/medg/misc/semeval_2010",
+parser.add_argument('--data_root',
+        default="/data/medg/misc/geeticka/relation_extraction/semeval_2010/pre-processed/original/",
                                                 help= "Data root directory")
-parser.add_argument('--train_text_dataset_path', default='train.txt',
+parser.add_argument('--train_text_dataset_path', default='train_original.txt',
                                                 help='test file')
-parser.add_argument('--test_text_dataset_path', default='test.txt',
+parser.add_argument('--test_text_dataset_path', default='test_original.txt',
                                                 help='test file')
 parser.add_argument('--dev_answer_file', default='answers_for_dev.txt',
                                                 help='dev answer file')

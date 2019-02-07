@@ -142,6 +142,31 @@ def read_macro_f1_from_result_file_ddi(result_filepath):
         result_file.close()
         return macro_f1_5way_with_none, macro_f1_5way_without_none, macro_f1_2way
 
+def read_macro_f1_from_result_file_i2b2(result_filepath):
+        '''
+        Retrieve the macro F1 score from the result file that perl eval/i2b2_relations_scorer.pl generates
+        '''
+        result_file = open(result_filepath, 'r')
+        for cur_line in result_file:
+            if cur_line.startswith('<<< The 8-way evaluation:'):
+                        cur_line = cur_line.replace('<<< The 8-way evaluation: micro-averaged F1 = ','')
+                        cur_line = cur_line.replace('% >>>','')
+                        micro_f1_8way = float(cur_line)
+            if cur_line.startswith('<<< The Problem-Treatment evaluation:'):
+                        cur_line = cur_line.replace('<<< The Problem-Treatment evaluation: micro-averaged F1 = ','')
+                        cur_line = cur_line.replace('% >>>','')
+                        micro_f1_probtreat = float(cur_line)
+            if cur_line.startswith('<<< The Problem-Test evaluation:'):
+                        cur_line = cur_line.replace('<<< The Problem-Test evaluation: micro-averaged F1 = ','')
+                        cur_line = cur_line.replace('% >>>','')
+                        micro_f1_probtest = float(cur_line)
+            if cur_line.startswith('<<< The Problem-Problem evaluation:'):
+                        cur_line = cur_line.replace('<<< The Problem-Problem evaluation: micro-averaged F1 = ','')
+                        cur_line = cur_line.replace('% >>>','')
+                        micro_f1_probprob = float(cur_line)
+        result_file.close()
+        return micro_f1_8way, micro_f1_probtreat, micro_f1_probtest, micro_f1_probprob
+
 #read the macro F1 from the necessary filepath
 def evaluate(result_filepath, answer_filepath, relation_dict, data_orin, preds, dataset):
     output_filepath_gold = test_writer_for_perl_evaluation(
@@ -151,6 +176,8 @@ def evaluate(result_filepath, answer_filepath, relation_dict, data_orin, preds, 
         eval_script = 'semeval2010_task8_scorer-v1.2.pl'
     elif dataset == 'ddi':
         eval_script = 'ddi_task9.2_scorer.pl'
+    elif dataset == 'i2b2':
+        eval_script = 'i2b2_relations_scorer.pl'
     command = (
         "perl ../eval/{0} {1} {2} > {3}"
         "".format(
@@ -166,3 +193,7 @@ def evaluate(result_filepath, answer_filepath, relation_dict, data_orin, preds, 
         macro_f1_5way_with_none, macro_f1_5way_without_none, macro_f1_2way = \
                 read_macro_f1_from_result_file_ddi(result_filepath)
         return macro_f1_5way_with_none, macro_f1_5way_without_none, macro_f1_2way
+    elif dataset == 'i2b2':
+        micro_f1_8way, micro_f1_probtreat, micro_f1_probtest, micro_f1_probprob = \
+                read_macro_f1_from_result_file_i2b2(result_filepath)
+        return micro_f1_8way, micro_f1_probtreat, micro_f1_probtest, micro_f1_probprob
