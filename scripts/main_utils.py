@@ -10,6 +10,13 @@ import time
 import datetime
 import relation_extraction.data.utils as utils
 
+# get the evaluation column as Macro F1 from macro_f1
+def get_eval_column(evaluation_metric_print):
+    eval_column = evaluation_metric_print.split('_')
+    eval_column[0] = eval_column[0].capitalize()
+    eval_column[1] = eval_column[1].capitalize()
+    eval_column = " ".join(eval_column)
+    return eval_column
 
 # given entity positions, find max length
 def max_ent_len(data):

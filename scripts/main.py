@@ -31,12 +31,14 @@ logging.getLogger().setLevel(logging.INFO)
 
 config = parser.get_config()
 
-
+# eval_metric refers to macro_f1 or micro_f1: it is a more general name to store the metric values
 if config.dataset == 'semeval2010':
     relation_dict = semeval_relation_dict
     config.classnum = max(relation_dict.keys()) # we are not considering the "other" class.
     folds = 10
     post = '_original' # this is determined by the preprocessing technique
+    evaluation_metric_print = 'macro_f1'
+    accumulated_metrics_print = '<macro_f1>'
     #TODO (geeticka): remove all arguments from config that are not passed in, for example folds and macro_f1_folds etc
 elif config.dataset == 'ddi':
     relation_dict = ddi_relation_dict
@@ -44,6 +46,8 @@ elif config.dataset == 'ddi':
     config.data_root = "/data/medg/misc/geeticka/relation_extraction/ddi/pre-processed/original/"
     config.embedding_file = '/data/medg/misc/geeticka/relation_extraction/biomed-embed/wikipedia-pubmed-and-PMC-w2v.txt'
     folds = 5
+    evaluation_metric_print = 'macro_f1'
+    accumulated_metrics_print = '<macro_f1: (5way with none, 5 way without none, 2 way)>'
     post = '_original' # pre-processing method 1 with negative instance filtering for same entities
 elif config.dataset == 'i2b2':
     relation_dict = i2b2_relation_dict
@@ -53,6 +57,8 @@ elif config.dataset == 'i2b2':
     #TODO: insert folds information; for now just have dummy folds
     folds = 5
     post = '_original' 
+    evaluation_metric_print = 'micro_f1'
+    accumulated_metrics_print = '<micro_f1: (8way, Prob-Treat, Prob-Test, Prob-Prob)>'
 
 
 config.train_text_dataset_path = 'train{post}.txt'.format(post=post)
@@ -346,21 +352,16 @@ def main():
             configProto.gpu_options.allow_growth = True
 
             with sv.managed_session(config=configProto) as session:
-                if config.dataset == 'ddi':
-                    macro_f1_print = '<macro_f1: (5way with none, 5 way without none, 2 way)>'
-                elif config.dataset == 'semeval2010':
-                    macro_f1_print = '<macro_f1>'
-                elif config.dataset == 'i2b2':
-                    macro_f1_print = '<micro_f1: (8way, Prob-Treat, Prob-Test, Prob-Prob)>'
                 print('Format of evaluation printing is as follows')
                 dev_or_test = 'dev' if config.use_test is False else 'test'
-                print('Last epoch macro_f1 {}: {}'.format(dev_or_test, macro_f1_print))
+                print('{metric} {eval_data}: {metric_val}'.format(metric=evaluation_metric_print, 
+                    eval_data=dev_or_test, metric_val=accumulated_metrics_print))
                 print(
-                    '<epoch>,<train accuracy>,<dev accuracy>,{}'.format(macro_f1_print)
+                    '<epoch>,<train accuracy>,<dev accuracy>,{}'.format(evaluation_metric_print)
                 )
                 if config.early_stop is True:
-                    best_early_stop_macro_f1 = 0
-                    best_early_stop_macro_f1_epoch_number = -1
+                    best_early_stop_eval_metric = 0
+                    best_early_stop_eval_metric_epoch_number = -1
                     patience_counter = 0
                 try:
                     for epoch in range(config.num_epoches):
@@ -382,7 +383,7 @@ def main():
                             config.output_folder, config.dev_answer_file
                         )
 
-                        macro_f1_dev = main_utils.evaluate(config.result_filepath, config.dev_answer_filepath,
+                        eval_metric_dev = main_utils.evaluate(config.result_filepath, config.dev_answer_filepath,
                                 relation_dict, dev_data_orin, dev_preds, config.dataset)
 
                         if config.early_stop is True:
@@ -393,26 +394,27 @@ def main():
                                     "result-earlystop.txt")
                             early_stop_answer_filepath = os.path.join(config.output_folder,
                             "answers_for_early_stop.txt")
-                            macro_f1_early_stop = main_utils.evaluate(early_stop_result_filepath,
+                            eval_metric_early_stop = main_utils.evaluate(early_stop_result_filepath,
                                     early_stop_answer_filepath, relation_dict, early_stop_data_orin, 
                                     early_stop_preds, config.dataset)
                             if config.dataset == 'ddi' or config.dataset == 'i2b2': # because eval is a tuple
-                                macro_f1_early_stop = macro_f1_early_stop[0]
+                                eval_metric_early_stop = eval_metric_early_stop[0]
 
                         if config.cross_validate is False:
-                            print('macro_f1 {0}: {1}'.format(dev_or_test, macro_f1_dev))
+                            print('{metric} {eval_data}: {metric_val}'.format(metric=evaluation_metric_print, 
+                                eval_data=dev_or_test, metric_val=eval_metric_dev))
                             print('{0},{1:.2f},{2:.2f},{3}'.format(epoch + 1, train_acc*100, dev_acc*100,
-                                macro_f1_dev))
+                                eval_metric_dev))
 
                         if config.early_stop is True:
                             patience_counter += 1
-                            if macro_f1_early_stop > best_early_stop_macro_f1:
-                                best_early_stop_macro_f1 = macro_f1_early_stop
-                                best_early_stop_macro_f1_epoch_number = epoch
+                            if eval_metric_early_stop > best_early_stop_eval_metric:
+                                best_early_stop_eval_metric = eval_metric_early_stop
+                                best_early_stop_eval_metric_epoch_number = epoch
                                 patience_counter = 0
 
                         # Recording epoch information
-                        results['epoch'][epoch][dev_or_test] = {'f1_macro': macro_f1_dev, 'accuracy': dev_acc}
+                        results['epoch'][epoch][dev_or_test] = {evaluation_metric_print: eval_metric_dev, 'accuracy': dev_acc}
                         results['epoch'][epoch]['train'] = {'accuracy': train_acc}
 
                         if config.early_stop is True:
@@ -420,26 +422,28 @@ def main():
                             if patience_counter > config.patience:
                                 print('Patience exceeded: early stop')
                                 results['execution_details']['early_stop'] = True
-                                results['epoch'][epoch]['early_stop'] = {'f1_macro': macro_f1_early_stop,
+                                results['epoch'][epoch]['early_stop'] = {evaluation_metric_print: eval_metric_early_stop,
                                         'accuracy': early_stop_acc}
-                                results['epoch'][epoch][dev_or_test] = {'f1_macro': macro_f1_dev, 'accuracy':
+                                results['epoch'][epoch][dev_or_test] = {evaluation_metric_print: eval_metric_dev, 'accuracy':
                                         dev_acc}
                                 results['epoch'][epoch]['train'] = {'accuracy': train_acc}
-                                config.macro_f1_folds.append(macro_f1_dev)
+                                config.eval_metric_folds.append(eval_metric_dev)
 
                                 if config.cross_validate is True:
-                                    print('Last epoch macro_f1 {0}: {1}'.format(dev_or_test, macro_f1_dev))
+                                    print('Last epoch {metric} {eval_data}: {metric_val}'.format(metric=evaluation_metric_print,
+                                                eval_data=dev_or_test, metric_val=eval_metric_dev))
                                     print('{0},{1:.2f},{2:.2f},{3}'.format(epoch+1, train_acc*100,
-                                        dev_acc*100, macro_f1_dev))
+                                        dev_acc*100, eval_metric_dev))
                                 break
 
                         if epoch == config.num_epoches - 1:
-                            config.macro_f1_folds.append(macro_f1_dev)
+                            config.eval_metric_folds.append(eval_metric_dev)
                             if config.cross_validate is True:
-                                print('Last epoch macro_f1 {0}: {1}'.format(dev_or_test, macro_f1_dev))
+                                print('Last epoch {metric} {eval_data}: {metric_val}'.format(metric=evaluation_metric_print, 
+                                    eval_data=dev_or_test, metric_val=eval_metric_dev))
                                 print(
                                     '{0},{1:.2f},{2:.2f},{3}'.format(
-                                        epoch+1, train_acc*100, dev_acc*100, macro_f1_dev
+                                        epoch+1, train_acc*100, dev_acc*100, eval_metric_dev
                                     ),
                                 )
 
@@ -477,7 +481,6 @@ if __name__ == '__main__':
 
         if config.cross_validate is True:
             num_folds = folds
-            #TODO: insert fold information about i2b2 data here
             for config.fold in range(0, num_folds):
                 start_time = time.time()
                 print('Fold {} Starting!'.format(config.fold))
@@ -489,24 +492,24 @@ if __name__ == '__main__':
 
             #TODO: handling of below can be better: just make it automatic rather than dataset specific
             if config.dataset == 'ddi':
-                macro_f1_type_by_fold = [x for x in zip(*config.macro_f1_folds)] # 3 types of macro F1 X folds
-                mean_macro_f1 = [np.mean(x) for x in macro_f1_type_by_fold]
-                std_macro_f1 = [np.std(x) for x in macro_f1_type_by_fold]
-                print("Cross validated F1 scores: %.2f +- %.2f %.2f +- %.2f %.2f +- %.2f"%(mean_macro_f1[0], 
-                    std_macro_f1[0], mean_macro_f1[1], std_macro_f1[1], mean_macro_f1[2], std_macro_f1[2]))
+                eval_metric_type_by_fold = [x for x in zip(*config.eval_metric_folds)] # 3 types of macro F1 X folds
+                mean_eval_metric = [np.mean(x) for x in eval_metric_type_by_fold]
+                std_eval_metric = [np.std(x) for x in eval_metric_type_by_fold]
+                print("Cross validated scores: %.2f +- %.2f %.2f +- %.2f %.2f +- %.2f"%(mean_eval_metric[0], 
+                    std_eval_metric[0], mean_eval_metric[1], std_eval_metric[1], mean_eval_metric[2], std_eval_metric[2]))
             elif config.dataset == 'semeval2010':
-                mean_macro_f1 = np.mean(config.macro_f1_folds)
-                std_macro_f1 = np.std(config.macro_f1_folds)
-                print("Cross validated F1 scores: %.2f +- %.2f"%(mean_macro_f1, std_macro_f1))
+                mean_eval_metric = np.mean(config.eval_metric_folds)
+                std_eval_metric = np.std(config.eval_metric_folds)
+                print("Cross validated scores: %.2f +- %.2f"%(mean_eval_metric, std_eval_metric))
             elif config.dataset == 'i2b2':
-                macro_f1_type_by_fold = [x for x in zip(*config.macro_f1_folds)]
-                mean_macro_f1 = [np.mean(x) for x in macro_f1_type_by_fold]
-                std_macro_f1 = [np.std(x) for x in macro_f1_type_by_fold]
-                print("Cross validated F1 scores: %.2f +- %.2f %.2f +- %.2f %.2f +- %.2f %.2f +- %.2f"%(mean_macro_f1[0], 
-                    std_macro_f1[0], mean_macro_f1[1], std_macro_f1[1], mean_macro_f1[2], std_macro_f1[2], 
-                    mean_macro_f1[3], std_macro_f1[3]))
+                eval_metric_type_by_fold = [x for x in zip(*config.eval_metric_folds)]
+                mean_eval_metric = [np.mean(x) for x in eval_metric_type_by_fold]
+                std_eval_metric = [np.std(x) for x in eval_metric_type_by_fold]
+                print("Cross validated scores: %.2f +- %.2f %.2f +- %.2f %.2f +- %.2f %.2f +- %.2f"%(mean_eval_metric[0], 
+                    std_eval_metric[0], mean_eval_metric[1], std_eval_metric[1], mean_eval_metric[2], std_eval_metric[2], 
+                    mean_eval_metric[3], std_eval_metric[3]))
 
-            print("All macro F1 scores", config.macro_f1_folds)
+            print("All {} scores {}", evaluation_metric_print, config.eval_metric_folds)
             print("ID of the model is", config.id)
             total_execution_time = sum(config.execution_time_folds)
             print("Execution Time (hr)", total_execution_time)
@@ -515,9 +518,9 @@ if __name__ == '__main__':
             parameters, _ = parser.get_results_dict(config, 0) # we don't care about second val and we also don't care about individual training time here
             parameters['train_start_folds'] = config.train_start_folds
             result['model_options'] = copy.copy(parameters)
-            result['macro_f1_folds'] = config.macro_f1_folds
-            result['mean_macro_f1'] = mean_macro_f1
-            result['std_macro_f1'] = std_macro_f1
+            result['macro_f1_folds'] = config.eval_metric_folds
+            result['mean_macro_f1'] = mean_eval_metric
+            result['std_macro_f1'] = std_eval_metric
             json.dump(result, open(os.path.join(config.result_folder, 'result.json'), 'w'), indent = 4,
                     sort_keys=True)
             config.final_result_folder = os.path.join(config.output_dir, 'Final_Result')
@@ -532,10 +535,11 @@ if __name__ == '__main__':
                 if 'Unnamed: 0' in result_dataframe.columns:
                     result_dataframe.drop('Unnamed: 0', axis=1, inplace=True)
             else:
-                # need to change below to Fold, parameters, macro_f1
+                eval_column = main_utils.get_eval_column(evaluation_metric_print)
+                # need to change below to Fold, parameters, eval_metric
                 result_dataframe = pd.DataFrame(
                     columns = [
-                        'Fold Number', 'Parameters', 'Macro F1', 'Train Start Time', 'Hyperparam Tuning Mode',
+                        'Fold Number', 'Parameters', eval_column, 'Train Start Time', 'Hyperparam Tuning Mode',
                         'ID', 'Date of Starting Command', 'Execution Time (hr)'
                     ], # will need to handle date of starting command differently for hyperparam tuning
                 )
@@ -545,7 +549,7 @@ if __name__ == '__main__':
             parms_to_add_to_df = {key: parameters[key] for key in parameters if key not in params_to_exclude}
             for i in range(start_index, start_index + num_folds):
                 result_dataframe.loc[i] = [
-                    curr_fold, str(parms_to_add_to_df), config.macro_f1_folds[curr_fold],
+                    curr_fold, str(parms_to_add_to_df), config.eval_metric_folds[curr_fold],
                     config.train_start_folds[curr_fold], config.hyperparam_tuning_mode, config.id, date,
                     config.execution_time_folds[curr_fold]
                 ]

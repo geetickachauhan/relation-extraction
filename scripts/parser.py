@@ -115,7 +115,7 @@ parser.add_argument('--hyperparam_tuning_mode', default=False, action='store_tru
 parser.add_argument('--fold', default=None, type=int,\
                                                 help='the current fold')
 # TODO(geeticka): Don't add things to argparse unless you want to set them on the command line.
-parser.add_argument('--macro_f1_folds', default=[], type=list,\
+parser.add_argument('--eval_metric_folds', default=[], type=list,\
                                                 help='the list of macro f1s for all folds if folds exist')
 parser.add_argument('--add_hyperparam_details', default=None, type=str, \
                                                 help='a string that contains information about miscellaneous'\
