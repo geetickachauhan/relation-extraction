@@ -31,32 +31,37 @@ logging.getLogger().setLevel(logging.INFO)
 
 config = parser.get_config()
 
+if not config.preprocessing_type in ['original', 'entity_blinding', 'punct_digit', 'punct_stop_digit']:
+    raise NotImplementedError('Preprocessing types can only be original, entity_blinding, punct_digit or punct_stop_digit')
+if not config.dataset in ['ddi', 'semeval2010', 'i2b2']:
+    raise NotImplementedError('Datasets currently supported are ddi, semeval 2010 or i2b2')
+
+
+post = '_' + config.preprocessing_type
+config.data_root = "/data/medg/misc/geeticka/relation_extraction/" + config.dataset + \
+        "/pre-processed/" + config.preprocessing_type + "/"
+
 # eval_metric refers to macro_f1 or micro_f1: it is a more general name to store the metric values
 if config.dataset == 'semeval2010':
     relation_dict = semeval_relation_dict
     config.classnum = max(relation_dict.keys()) # we are not considering the "other" class.
     folds = 10
-    post = '_original' # this is determined by the preprocessing technique
     evaluation_metric_print = 'macro_f1'
     accumulated_metrics_print = '<macro_f1>'
     #TODO (geeticka): remove all arguments from config that are not passed in, for example folds and macro_f1_folds etc
 elif config.dataset == 'ddi':
     relation_dict = ddi_relation_dict
     config.classnum = max(relation_dict.keys()) # 4 classes are being predicted
-    config.data_root = "/data/medg/misc/geeticka/relation_extraction/ddi/pre-processed/original/"
     config.embedding_file = '/data/medg/misc/geeticka/relation_extraction/biomed-embed/wikipedia-pubmed-and-PMC-w2v.txt'
     folds = 5
     evaluation_metric_print = 'macro_f1'
     accumulated_metrics_print = '<macro_f1: (5way with none, 5 way without none, 2 way)>'
-    post = '_original' # pre-processing method 1 with negative instance filtering for same entities
 elif config.dataset == 'i2b2':
     relation_dict = i2b2_relation_dict
     config.classnum = max(relation_dict.keys()) + 1 # we do not have an 'other' class here
-    config.data_root = "/data/medg/misc/geeticka/relation_extraction/i2b2/pre-processed/original/"
     config.embedding_file = '/data/medg/misc/geeticka/relation_extraction/biomed-embed/wikipedia-pubmed-and-PMC-w2v.txt'
     #TODO: insert folds information; for now just have dummy folds
     folds = 5
-    post = '_original' 
     evaluation_metric_print = 'micro_f1'
     accumulated_metrics_print = '<micro_f1: (8way, Prob-Treat, Prob-Test, Prob-Prob)>'
 

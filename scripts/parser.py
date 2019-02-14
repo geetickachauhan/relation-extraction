@@ -110,6 +110,8 @@ parser.add_argument('--use_test', default=False, action='store_true',
                                                 help='use the full train and test data split')
 parser.add_argument('--hyperparam_tuning_mode', default=False, action='store_true',
                                                 help='whether hyperparameter tuning mode was on')
+parser.add_argument('--preprocessing_type', default='original', 
+help= 'specify the preprocessing type from original, entity_blinding, punct_digit, punct_stop_digit')
 
 #TODO (geeticka) : below is not needed to include in parser
 parser.add_argument('--fold', default=None, type=int,\
@@ -133,6 +135,7 @@ def get_results_dict(config, train_start_time_in_miliseconds):
     results = {} # this dictionary will contain all the result of the experiment    results['model_options'] = copy.copy(model_options)
     parameters = {}
     parameters['dataset'] = config.dataset
+    parameters['preprocessing_type'] = config.preprocessing_type
     parameters['id'] = config.id
     parameters['pos_embed_size'] = config.pos_embed_size
     parameters['pos_embed_num'] = config.pos_embed_num
