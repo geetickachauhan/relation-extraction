@@ -8,7 +8,7 @@
 import spacy
 from ast import literal_eval
 import pandas as pd
-parser = spacy.load('en')
+nlp = spacy.load('en')
 
 
 relation_dict = {0:'Component-Whole(e2,e1)', 1:'Instrument-Agency(e2,e1)', 2:'Member-Collection(e1,e2)',
@@ -21,7 +21,7 @@ relation_dict = {0:'Component-Whole(e2,e1)', 1:'Instrument-Agency(e2,e1)', 2:'Me
 rev_relation_dict = {val: key for key, val in relation_dict.items()}
 
 def tokenize(sentence):
-    doc = parser(sentence)
+    doc = nlp(sentence)
     tokenized = []
     for token in doc:
         tokenized.append(token.text)
