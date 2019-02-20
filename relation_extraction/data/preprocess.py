@@ -205,6 +205,173 @@ def replace_digit_punctuation_stop_word(row, stop_word_removal=True):
 
 
 '''
+Preprocessing Type 3 part 1: NER
+'''
+
+# a method to check for overlap between the ner_dict that is created
+def check_for_overlap(ner_dict):
+    def expand_key(string): # a string that looks like '2:2' to [2]
+        start = int(string.split(':')[0])
+        end = int(string.split(':')[1])
+        return list(range(start, end+1))
+    expanded_keys = [expand_key(key) for key in ner_dict.keys()]
+    for i1, item in enumerate(expanded_keys):
+        for i2 in range(i1 + 1, len(expanded_keys)):
+            if set(item).intersection(expanded_keys[i2]):
+                return True # overlap is true
+        for i2 in range(0, i1):
+            if set(item).intersection(expanded_keys[i2]):
+                return True
+    return False
+
+
+###
+### Helper functions for the NER replacement
+###
+def overlap_index(index1, index2):
+    def expand(index):
+        start = index[0]
+        end = index[1]
+        return list(range(start, end+1))
+    expand_index1 = expand(index1)
+    expand_index2 = expand(index2)
+    if set(expand_index1).intersection(set(expand_index2)):
+        return True
+    else: return False
+    
+# for indexes that look like (1,1) and (2,2) check if the left is fully included in the right
+def fully_included(index1, index2):
+    if index1[0] >= index2[0] and index1[1] <= index2[1]: return True
+    else: return False
+
+def beginning_overlap(index1, index2): # this is tricky when (1,1) and (2,2) are there
+    if index1[0] < index2[0] and index1[1] <= index2[1]: return True
+    else: return False
+
+def end_overlap(index1, index2): # this is tricky
+    if index1[0] >= index2[0] and index1[1] > index2[1]: return True
+    else: return False
+    
+def beginning_and_end_overlap(index1, index2):
+    if index1[0] < index2[0] and index1[1] > index2[1]: return True
+    else:
+        return False
+#else there is no overlap
+    
+def correct_entity_indexes_with_ner(ner_dict, e_index):
+    new_e_index = []
+    for i in range(len(e_index)): # we are reading tuples here
+        for key in ner_dict.keys():
+            indexes = e_index[i]
+            index2 = indexes
+            index1 = parse_position(key) # checking if ner is fully included etc
+            if not overlap_index(index1, index2): # don't do below if there is no overlap
+                continue
+            if beginning_overlap(index1, index2):
+                e_index[i] = (index1[0], e_index[i][1])
+            elif end_overlap(index1, index2):
+                e_index[i] = (e_index[i][0], index1[1])
+            elif beginning_and_end_overlap(index1, index2):
+                e_index[i] = (index1[0], index1[1]) # else you don't change or do anything
+    return e_index
+            
+
+# given all of these dictionaries, return the ner replacement dictionary
+def get_ner_replacement_dictionary(only_e1_index, only_e2_index, common_indexes, ner_dict):
+    def update_dict_with_entity(e_index, ner_repl_dict, entity_name):
+        for indexes in e_index:
+            key1 = str(indexes[0]) + ':' + str(indexes[0])
+            ner_repl_dict[key1] = {'replace_by': None, 'insert': entity_name + 'START'}
+            key2 = str(indexes[-1] + 1) + ':' + str(indexes[-1] + 1)
+            ner_repl_dict[key2] = {'replace_by': None, 'insert': entity_name + 'END'}
+        return ner_repl_dict
+    # we are going to do something different: only spans for NER will be counted, but
+    # for the ENTITYSTART and ENTITYEND, we will keep the span as what token to insert before
+    ner_repl_dict = {}
+    for key in ner_dict:
+        ner_repl_dict[key] = {'replace_by': ner_dict[key], 'insert': None}
+    ner_repl_dict = update_dict_with_entity(only_e1_index, ner_repl_dict, entity1)
+    ner_repl_dict = update_dict_with_entity(only_e2_index, ner_repl_dict, entity2)
+    ner_repl_dict = update_dict_with_entity(common_indexes, ner_repl_dict, entity_either)
+    return ner_repl_dict
+
+# this function is different from the sort_position_keys because
+# we care about sorting not just by the beginning token, but also by the length that the span contains
+def ner_sort_position_keys(ner_repl_dict): # this can potentially replace sort_position_keys
+    # but only if the application of this function does not change the preprocessed CSVs generated
+    def len_key(key):
+        pos = parse_position(key)
+        return pos[1] - pos[0] + 1
+    positions = list(ner_repl_dict.keys())
+    sorted_positions = sorted(positions, key=lambda x: (parse_position(x)[0], len_key(x)))
+    return sorted_positions
+
+# given a splitted sentence - make sure that the sentence is in list form
+def get_ner_dict(sentence):
+    tokenizedSentence = sentence # in this case lowercasing is not helpful
+    doc = Doc(nlp.vocab, words=tokenizedSentence)
+    nlp.tagger(doc)
+    nlp.parser(doc)
+    nlp.entity(doc) # run NER
+    ner_dict = {} # first test for overlaps within ner
+    for ent in doc.ents:
+        key = str(ent.start) + ':' + str(ent.end - 1)
+        ner_dict[key] = ent.label_
+    return ner_dict
+
+def replace_ner(row, check_ner_overlap=False): # similar to concept_replace, with some caveats
+    sentence = row.tokenized_sentence.split()
+    e1_indexes = row.metadata['e1']['word_index']
+    e2_indexes = row.metadata['e2']['word_index']
+    only_e1_indexes, only_e2_indexes, common_indexes = \
+    get_common_and_separate_entities(e1_indexes, e2_indexes)
+    ner_dict = get_ner_dict(sentence)
+    if check_ner_overlap and check_for_overlap(ner_dict):
+        print("There is overlap", ner_dict) # only need to check this once
+    #Below code works only if there isn't overlap within ner_dict, so make sure that there isn't overlap
+    
+    # overlaps between ner label and e1 and e2 indexes are a problem
+    # And they can be of two types
+        # Type 1: NER overlaps with e1 or e2 in the beginning or end
+        # Here we want to keep the NER link the same but extend e1 or e2 index to the beginning or end of the
+        # NER 
+
+        #Type 2: NER is inside of the entity completely: At this point it should be simply ok to mention at what 
+        # token to insert ENTITYstart and ENTITYend
+        # Type 1 is a problem, but Type 2 is easy to handle while the new sentence is being created
+        
+    only_e1_indexes = correct_entity_indexes_with_ner(ner_dict, only_e1_indexes)
+    only_e2_indexes = correct_entity_indexes_with_ner(ner_dict, only_e2_indexes)
+    common_indexes = correct_entity_indexes_with_ner(ner_dict, common_indexes)
+        
+    ner_repl_dict = get_ner_replacement_dictionary(only_e1_indexes, only_e2_indexes, common_indexes,
+                                                  ner_dict)
+    sorted_positions = ner_sort_position_keys(ner_repl_dict)
+    new_sentence = '' # this below part is buggy, shouldn't be too bad to fix 
+    for i in range(len(sorted_positions)):
+        curr_pos = sorted_positions[i]
+        curr_start_pos, curr_end_pos = parse_position(curr_pos)
+        curr_dict = ner_repl_dict[curr_pos]
+        start_insert = '' if curr_dict['insert'] is None else curr_dict['insert'].upper()
+        between_replace = list_to_string(sentence[curr_start_pos: curr_end_pos + 1]) \
+        if curr_dict['replace_by'] is None else curr_dict['replace_by']
+        if i == 0:
+            new_sentence += list_to_string(sentence[:curr_start_pos]) + ' ' + start_insert + ' ' + \
+            between_replace + ' '
+        else:
+            prev_pos = sorted_positions[i-1]
+            _, prev_end_pos = parse_position(prev_pos)
+            middle = list_to_string(sentence[prev_end_pos+1 : curr_start_pos]) # refers to middle between prev
+            # segment and the current segment
+            if middle == '':
+                middle = ' '
+            new_sentence += middle + ' ' + start_insert + ' ' + between_replace + ' '
+            if i == len(sorted_positions) - 1 and curr_end_pos < len(sentence) - 1:
+                new_sentence += ' ' + list_to_string(sentence[curr_end_pos+1:])
+    new_sentence = remove_whitespace(new_sentence)
+    return new_sentence
+
+'''
 Below methods do entity detection from the tagged sentences, i.e. a sentence that contains 
 ESTART, EEND etc, use that to detect the locations of the respective entities and remove the tags
 from the sentence to return something clean
@@ -287,6 +454,8 @@ def preprocess(read_dataframe, df_directory, type_to_do=1):
         df['tagged_sentence'] = df.apply(replace_digit_punctuation_stop_word, args=(True,), axis=1)
     elif type_to_do == 3:
         df['tagged_sentence'] = df.apply(replace_digit_punctuation_stop_word, args=(False,), axis=1)
+    elif type_to_do == 4:
+        df['tagged_sentence'] = df.apply(replace_ner, args=(False,), axis=1)
     df = df.apply(update_metadata_sentence, axis=1)
     #df = df.rename({'tokenized_sentence': 'preprocessed_sentence'}, axis=1)
     df = df.drop(['tagged_sentence'], axis=1)
