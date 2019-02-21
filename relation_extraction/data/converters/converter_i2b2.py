@@ -112,8 +112,11 @@ def read_rel_line(rel_line):
             'e2_word': concept2_name, 'e2_from': from_word_concept2, 'e2_to': to_word_concept2, 
             'line_num': line1_concept1, 'relation': relation}
 
+# below is for the case that you do not want to extract the None relations from the data, 
+# because that is inferred from the concept types rather than explicitly present in the 
+# relation annotations
 # give it a directory with res(directory + 'concept/')
-def get_dataset_dataframe(concept_directory, rel_directory, txt_directory):
+def get_dataset_dataframe_classification(concept_directory, rel_directory, txt_directory):
     data = []
     total_rel_files_to_read = glob.glob(os.path.join(rel_directory, '*'))
     
@@ -150,6 +153,219 @@ def get_dataset_dataframe(concept_directory, rel_directory, txt_directory):
     df = pd.DataFrame(data,
             columns='original_sentence,e1,e2,relation_type,metadata,tokenized_sentence'.split(','))
     return df
+
+'''
+Get the dataframe for the extraction case
+'''
+# arrange the concepts in the concept dict by the linenumber for faster processing
+def get_concepts_by_linenum(concept_dict):
+    concept_dict_by_linenum = {}
+    for key in concept_dict.keys():
+        linenum, _ = get_line_number_and_word_number(key)
+        linenum = str(linenum)
+        if linenum in concept_dict_by_linenum:
+             concept_dict_by_linenum[linenum].append(key)
+        else:
+            concept_dict_by_linenum[linenum] = [key]
+    return concept_dict_by_linenum
+
+# arrange the relation pairs in a list by their linenumber for faster processing
+def get_relation_pair_by_linenum(artificial_relations_pair):
+    non_existant_relations_by_linenum = {}
+    for relation_pair in artificial_relations_pair:
+        relation_pair = list(relation_pair)
+        linenum, _ = get_line_number_and_word_number(relation_pair[0])
+        linenum2, _ = get_line_number_and_word_number(relation_pair[1])
+        if linenum != linenum2: print('Problem! The relation pair ', relation_pair, ' spans multiple lines.')
+        linenum = str(linenum)
+        if linenum in non_existant_relations_by_linenum:
+            non_existant_relations_by_linenum[linenum].append(relation_pair)
+        else:
+            non_existant_relations_by_linenum[linenum] = [relation_pair]
+    return non_existant_relations_by_linenum
+
+
+# check if the relation pair already exists in the artificial relations pair generated
+# written in the form of linenum:from;linenum:to as keys to the concept dictionary
+def relation_exist_in_pair_list(artificial_relations_pair, relation_pair):
+    for concept_pair in artificial_relations_pair:
+        if relation_pair == concept_pair:
+            return True
+    return False
+
+# generate a list of 'artificial relation pairs' - according to i2b2 dataset providers
+# relations can exist between the Problem-Problem, Problem-Treatment and Problem-Test 
+# relations. The job of this function is to provide an initial list from that.
+def get_artificial_relation_pair(concept_dict_by_linenum, concept_dict):
+    artificial_relations_pair = []
+    for linenum in concept_dict_by_linenum.keys():
+        concepts = concept_dict_by_linenum[linenum]
+        for i1, concept1 in enumerate(concepts):
+            indexes_to_look_through = list(range(0, i1))
+            indexes_to_look_through.extend(range(i1+1, len(concepts)))
+            for i2 in indexes_to_look_through:
+                concept2 = concepts[i2]
+                relation_pair = {concept1, concept2}
+                if relation_exist_in_pair_list(artificial_relations_pair, relation_pair):
+                    continue
+                # if it doesn't already exist in the artificial relation pair, the following runs
+                type_pair = {concept_dict[concept1]['type'], concept_dict[concept2]['type']}
+                if type_pair == {'problem', 'problem'} or type_pair == {'problem', 'test'} or \
+                type_pair == {'problem', 'treatment'}:
+                    artificial_relations_pair.append(relation_pair)
+    return artificial_relations_pair
+
+# append existing relations to a list known as data, to populate the dataframe later
+def append_existing_relations(data, rel_file, text_file, base_filename, artificial_relations_pair, 
+        concept_dict):
+    for rel_line in rel_file:
+        rel_dict = read_rel_line(rel_line)
+        tokenized_sentence = text_file[int(rel_dict['line_num']) - 1].strip()
+        sentence_text = tokenized_sentence
+        e1 = rel_dict['e1_word']
+        e2 = rel_dict['e2_word']
+        relation_type = rel_dict['relation']
+        linenum = rel_dict['line_num']
+        entity_replacement_dict = get_entity_replacement_dictionary(linenum, concept_dict)
+
+        concept1_key = linenum + ':' + rel_dict['e1_from'] + ';' + linenum + ':' + rel_dict['e1_to']
+        concept2_key = linenum + ':' + rel_dict['e2_from'] + ';' + linenum + ':' + rel_dict['e2_to']
+        relation_pair = {concept1_key, concept2_key}
+        # There is a bug in the data - annotations where they have a pair which is treatment-treatment
+        # In such cases just print those cases that are not present in the list and will send an error
+        # catch the error and print something
+        try:
+            artificial_relations_pair.remove(relation_pair)
+        except ValueError: 
+            print('Message from append_existing_relations(): The relation pair ', relation_pair, 
+                    'is not present in the artificial relations pair and their respective types are ', 
+                    concept_dict[concept1_key]['type'], concept_dict[concept2_key]['type'])
+        # this should not have errored out - maybe there is an error in the artificial 
+
+        e1_idx = [(rel_dict['e1_from'], rel_dict['e1_to'])]
+        e2_idx = [(rel_dict['e2_from'], rel_dict['e2_to'])]
+
+        metadata = {'e1': {'word': str(e1), 'word_index': e1_idx},
+                    'e2': {'word': str(e2), 'word_index': e2_idx},
+                    'entity_replacement': entity_replacement_dict,
+                    'sentence_id': str(linenum), # numbering starts from 1
+                    'filename': str(base_filename)}
+        data.append([str(sentence_text), str(e1), str(e2), str(relation_type), metadata,
+            str(tokenized_sentence)])
+    return data, artificial_relations_pair
+
+# given concept dictionary and relation pair, assign the right ordering to entity1 and entity2
+# Treatment appears first, then problem and similar with Test-Problem
+# But for Problem-Problem, they are arranged by whichever appears first in the sentence
+def assign_e1_e2_relation(concept_dict, relation_pair):
+    type1 = concept_dict[relation_pair[0]]['type']
+    type2 = concept_dict[relation_pair[1]]['type']
+    if type1 == 'problem' and type2 == 'problem':
+        # in this case we will arrange by whichever appears first in the sentence
+        _, wordnum1 = get_line_number_and_word_number(relation_pair[0].split(';')[0]) # just judging by the from
+        _, wordnum2 = get_line_number_and_word_number(relation_pair[1].split(';')[0])
+        if int(wordnum1) < int(wordnum2):
+            entity1 = relation_pair[0]
+            entity2 = relation_pair[1]
+        elif int(wordnum1) > int(wordnum2):
+            entity1 = relation_pair[1]
+            entity2 = relation_pair[0]
+        else: print('There is a problem! Two entities are starting at the same number. Unexpected. ')
+        relation_type = 'PP-None'
+    elif type1 == 'treatment' and type2 == 'problem':
+        entity1 = relation_pair[0]
+        entity2 = relation_pair[1]
+        relation_type = 'TrP-None'
+    elif type1 == 'problem' and type2 == 'treatment':
+        entity1 = relation_pair[1]
+        entity2 = relation_pair[0]
+        relation_type = 'TrP-None'
+    elif type1 == 'test' and type2 == 'problem':
+        entity1 = relation_pair[0]
+        entity2 = relation_pair[1]
+        relation_type = 'TeP-None'
+    elif type1 == 'problem' and type2 == 'test':
+        entity1 = relation_pair[1]
+        entity2 = relation_pair[0]
+        relation_type = 'TeP-None'
+    else: print('Message from assign_e1_e2_relation(): This pairing of the types should not be possible!')
+    return entity1, entity2, relation_type
+    
+
+# append the relations that do not exist to a list known as data 
+def append_non_existing_relations(data, text_file, base_filename, relation_pair_by_linenum, concept_dict):
+    for linenum in relation_pair_by_linenum.keys():
+        relation_pairs = relation_pair_by_linenum[linenum]
+        entity_replacement_dict = get_entity_replacement_dictionary(linenum, concept_dict)
+        # the idea is that going line by line rather than per relation pair, we are 
+        # saving computation time on the above
+        tokenized_sentence = text_file[int(linenum) - 1].strip()
+        for relation_pair in relation_pairs:
+            sentence_text = tokenized_sentence
+            # e1 and e2 are decided based on the type
+                # in problem-problem cases, we arange based on which word appears first in the sentence
+                # in the problem-treatment cases, treatment always goes first
+                # in the problem-test cases, test always goes first
+            entity1, entity2, relation_type = assign_e1_e2_relation(concept_dict, relation_pair)
+            e1 = concept_dict[entity1]['word']
+            e2 = concept_dict[entity2]['word']
+
+            entity1_from_linenum, entity1_to_linenum = entity1.split(';')
+            entity2_from_linenum, entity2_to_linenum = entity2.split(';')
+
+            _, entity1_from = get_line_number_and_word_number(entity1_from_linenum)
+            _, entity1_to = get_line_number_and_word_number(entity1_to_linenum)
+            _, entity2_from = get_line_number_and_word_number(entity2_from_linenum)
+            _, entity2_to = get_line_number_and_word_number(entity2_to_linenum)
+
+            e1_idx = [(entity1_from, entity1_to)]
+            e2_idx = [(entity2_from, entity2_to)]
+
+            metadata = {'e1': {'word': str(e1), 'word_index': e1_idx},
+                        'e2': {'word': str(e2), 'word_index': e2_idx},
+                        'entity_replacement': entity_replacement_dict,
+                        'sentence_id': str(linenum),
+                        'filename': str(base_filename)}
+            data.append([str(sentence_text), str(e1), str(e2), str(relation_type), metadata, 
+                        str(tokenized_sentence)])
+    return data
+
+# populate the dataframe for the extraction case when we also train and test on non existing 
+# relation pairs
+def get_dataset_dataframe_extraction(concept_directory, rel_directory, txt_directory):
+    data = []
+    total_rel_files_to_read = glob.glob(os.path.join(rel_directory, '*'))
+    
+    for rel_file_path in tqdm(total_rel_files_to_read):
+        with open(rel_file_path, 'r') as rel_file:
+            base_filename = get_filename_without_extension(rel_file_path)
+            concept_file_path = os.path.join(concept_directory, base_filename + '.con')
+            concept_dictionary = get_concept_dictionary(concept_file_path)
+            
+            text_file_path = os.path.join(txt_directory, base_filename + '.txt')
+            text_file = open(text_file_path, 'r').readlines()
+            concept_dict_by_linenum = get_concepts_by_linenum(concept_dictionary)
+            
+            # these are all the viable relation pairs that could exist in the list
+            artificial_relations_pair = get_artificial_relation_pair(concept_dict_by_linenum, concept_dictionary)
+            
+            data, artificial_relations_pair = append_existing_relations(data, rel_file, text_file, base_filename,
+                                                                        artificial_relations_pair, 
+                                                                        concept_dictionary)
+            relation_pair_by_linenum = get_relation_pair_by_linenum(artificial_relations_pair)
+            
+            data = append_non_existing_relations(data, text_file, base_filename, relation_pair_by_linenum,
+                                                concept_dictionary)
+    df = pd.DataFrame(data,
+            columns='original_sentence,e1,e2,relation_type,metadata,tokenized_sentence'.split(','))
+    return df
+
+def get_dataset_dataframe(concept_directory, rel_directory, txt_directory, extract_none_relations=True):
+    if extract_none_relations is True:
+        function_to_call = get_dataset_dataframe_extraction
+    else:
+        function_to_call = get_dataset_dataframe_classification
+    return function_to_call(concept_directory, rel_directory, txt_directory)
 
 
 # to streamline the writing of the dataframe
