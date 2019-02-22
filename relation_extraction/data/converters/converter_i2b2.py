@@ -13,7 +13,7 @@ import pandas as pd
 from tqdm import tqdm
 from ast import literal_eval
 
-relation_dict = {0: 'TrIP', 1: 'TrWP', 2: 'TrCP', 3: 'TrAP', 4: 'TrNAP', 5: 'TeRP', 6: 'TeCP', 7: 'PIP'}
+relation_dict = {0: 'TrIP', 1: 'TrWP', 2: 'TrCP', 3: 'TrAP', 4: 'TrNAP', 5: 'TeRP', 6: 'TeCP', 7: 'PIP', 8: 'TrP-None', 9: 'TeP-None', 10: 'PP-None'}
 rev_relation_dict = {val: key for key, val in relation_dict.items()}
 
 # given a file path, just get the name of the file

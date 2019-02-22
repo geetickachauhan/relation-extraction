@@ -96,9 +96,10 @@ sub getIDandLabel() {
 
 
 	return ($id, $label)
-    if (($label eq 'TrIP') || ($label eq 'TrWP') || ($label eq 'TrCP') ||
+	if (($label eq 'TrIP') || ($label eq 'TrWP') || ($label eq 'TrCP') ||
 		($label eq 'TrAP') || ($label eq 'TrNAP') || ($label eq 'TeRP') ||
-		($label eq 'TeCP')   || ($label eq 'PIP'));
+		($label eq 'TeCP')   || ($label eq 'PIP') || ($label eq 'TrP-None') || 
+		($label eq 'TeP-None') || ($label eq 'PP-None'));
 	
 	return (-1, ());
 }

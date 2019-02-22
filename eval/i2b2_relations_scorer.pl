@@ -63,22 +63,25 @@ use strict;
 ###   I/O   ###
 ###############
 
-if ($#ARGV != 1) {
-	die "Usage:\ni2b2_relations_scorer.pl <PROPOSED_ANSWERS> <ANSWER_KEY>\n";
+# to give the index of the last element in the array 
+if ($#ARGV != 2) {
+	die "Usage:\ni2b2_relations_scorer.pl <PROPOSED_ANSWERS> <ANSWER_KEY> <NONE_PRESENT>\n";
 }
 
 my $PROPOSED_ANSWERS_FILE_NAME = $ARGV[0];
 my $ANSWER_KEYS_FILE_NAME      = $ARGV[1];
+my $NONE_PRESENT = $ARGV[2];
 
-
+if ($NONE_PRESENT != 1 and $NONE_PRESENT != 0) {
+  die "Enter 0 for case when None class is not present, enter 1 for None class being present as a relation";}
 ################
 ###   MAIN   ###
 ################
 
-my (%confMatrix8way, %confMatrix3way) = ();
+my (%confMatrix8way) = ();
 my (%idsProposed, %idsAnswer) = ();
-my (%allLabels8wayAnswer, %allLabels3wayAnswer) = ();
-my (%allLabels8wayProposed, %allLabels3wayProposed) = ();
+my (%allLabels8wayAnswer) = ();
+my (%allLabels8wayProposed) = ();
 
 ### 1. Read the file contents
 my $totalProposed = &readFileIntoHash($PROPOSED_ANSWERS_FILE_NAME, \%idsProposed);
@@ -97,13 +100,6 @@ foreach my $id (keys %idsProposed) {
 	$confMatrix8way{$labelProposed}{$labelAnswer}++;
 	$allLabels8wayProposed{$labelProposed}++;
 
-        ### 2.3 Update the 3-way confusion matrix
-	my $labelProposed3way = $idsProposed{$id};
-	my $labelAnswer3way   = $idsAnswer{$id};
-        $labelProposed3way = &getThreeWayEval($labelProposed3way);
-        $labelAnswer3way = &getThreeWayEval($labelAnswer3way);
-	$confMatrix3way{$labelProposed3way}{$labelAnswer3way}++;
-	$allLabels3wayProposed{$labelProposed3way}++;
 
 }
 
@@ -114,10 +110,6 @@ foreach my $id (keys %idsAnswer) {
 	my $labelAnswer = $idsAnswer{$id};
 	$allLabels8wayAnswer{$labelAnswer}++;
 
-	### 3.2. Update the 3-way answer distribution
-	my $labelAnswer3way = $labelAnswer;
-        $labelAnswer3way = &getThreeWayEval($labelAnswer3way);
-	$allLabels3wayAnswer{$labelAnswer3way}++;
 }
 
 ### 4. Check for proposed classes that are not contained in the answer key file: this may happen in cross-validation
@@ -127,11 +119,12 @@ foreach my $labelProposed (sort keys %allLabels8wayProposed) {
 	}
 }
 
+print "Please Note: These evaluations do not count the performance on the None classes, as per the i2b2 rules\n\n";
 ### 4. 8-way evaluation
 print "<<< 8-WAY EVALUATION >>>:\n\n";
 &printConfusionMatrix(\%confMatrix8way, \%allLabels8wayProposed, \%allLabels8wayAnswer, $totalProposed, $totalAnswer);
 
-my ($microF1, $microF1_ProbTreat, $microF1_ProbTest, $microF1_ProbProb) = &evaluate(\%confMatrix8way, \%allLabels8wayProposed, \%allLabels8wayAnswer, $totalProposed, $totalAnswer);
+my ($microF1, $microF1_ProbTreat, $microF1_ProbTest, $microF1_ProbProb) = &evaluate(\%confMatrix8way, \%allLabels8wayProposed, \%allLabels8wayAnswer, $totalProposed, $totalAnswer, $NONE_PRESENT);
 
 
 
@@ -154,9 +147,10 @@ sub getIDandLabel() {
 
 
 	return ($id, $label)
-    if (($label eq 'TrIP') || ($label eq 'TrWP') || ($label eq 'TrCP') ||
+	if (($label eq 'TrIP') || ($label eq 'TrWP') || ($label eq 'TrCP') ||
 		($label eq 'TrAP') || ($label eq 'TrNAP') || ($label eq 'TeRP') ||
-		($label eq 'TeCP')   || ($label eq 'PIP'));
+		($label eq 'TeCP')   || ($label eq 'PIP') || ($label eq 'TrP-None') || 
+		($label eq 'TeP-None') || ($label eq 'PP-None'));
 	
 	return (-1, ());
 }
@@ -205,7 +199,7 @@ sub printConfusionMatrix() {
 	print "Confusion matrix:\n";
 	print "       ";
 	foreach my $label (@allLabels) {
-		printf " %5s", $label;
+		printf " %5s", &getShortRelName($label);
 	}
 	print " <-- classified as\n";
 	print "      +";
@@ -222,7 +216,7 @@ sub printConfusionMatrix() {
 	foreach my $labelAnswer (sort keys %{$allLabelsAnswer}) {
 
 		### 2.1. Output the short relation label
-		printf " %5s |", $labelAnswer;
+		printf " %5s |", &getShortRelName($labelAnswer);
 
 		### 2.2. Output a row of the confusion matrix
 		my $sumProposed = 0;
@@ -272,7 +266,7 @@ sub printConfusionMatrix() {
 }
 
 sub evaluate(){
-	my ($confMatrix, $allLabelsProposed, $allLabelsAnswer, $totalProposed, $totalAnswer) = @_;
+	my ($confMatrix, $allLabelsProposed, $allLabelsAnswer, $totalProposed, $totalAnswer, $NONE_PRESENT) = @_;
 	### 8. Output P, R, F1 for each relation
 	my ($macroP, $macroR, $macroF1) = (0, 0, 0);
 	my ($microCorrect, $microProposed, $microAnswer) = (0, 0, 0);
@@ -309,12 +303,14 @@ sub evaluate(){
 			 "%     F1 = ", $F1, '%';
 
 		### 8.5. Accumulate statistics for micro/macro-averaging
+                if (($NONE_PRESENT == 0) or ($NONE_PRESENT == 1 and !($labelAnswer eq 'TrP-None') and !($labelAnswer eq 'TeP-None') and !($labelAnswer eq 'PP-None'))){
 		$macroP  += $P;
 		$macroR  += $R;
 		$macroF1 += $F1;
 		$microCorrect += $$confMatrix{$labelAnswer}{$labelAnswer};
 		$microProposed += $$allLabelsProposed{$labelAnswer};
 		$microAnswer += $$allLabelsAnswer{$labelAnswer};
+                }
 		if (($labelAnswer eq 'TrIP') || ($labelAnswer eq 'TrWP') || ($labelAnswer eq 'TrCP') ||
 			($labelAnswer eq 'TrAP') || ($labelAnswer eq 'TrNAP')){
 			$macroP_ProbTreat += $P;
@@ -420,6 +416,13 @@ sub evaluate(){
 }
 
 
+sub getShortRelName() {
+	my ($relName) = @_;
+	return 'TeP-N' if ($relName eq 'TeP-None');
+	return 'TrP-N' if ($relName eq 'TrP-None');
+	return 'PP-N' if ($relName eq 'PP-None');
+	return $relName;
+}
 
 sub mergeLabelLists() {
 	my ($hash1, $hash2, $mergedList) = @_;
