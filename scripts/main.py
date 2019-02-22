@@ -514,7 +514,7 @@ if __name__ == '__main__':
                     std_eval_metric[0], mean_eval_metric[1], std_eval_metric[1], mean_eval_metric[2], std_eval_metric[2], 
                     mean_eval_metric[3], std_eval_metric[3]))
 
-            print("All {} scores {}", evaluation_metric_print, config.eval_metric_folds)
+            print("All {} scores {}".format(evaluation_metric_print, config.eval_metric_folds))
             print("ID of the model is", config.id)
             total_execution_time = sum(config.execution_time_folds)
             print("Execution Time (hr)", total_execution_time)
