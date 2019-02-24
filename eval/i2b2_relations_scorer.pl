@@ -64,24 +64,27 @@ use strict;
 ###############
 
 # to give the index of the last element in the array 
-if ($#ARGV != 2) {
-	die "Usage:\ni2b2_relations_scorer.pl <PROPOSED_ANSWERS> <ANSWER_KEY> <NONE_PRESENT>\n";
+if ($#ARGV != 1) {
+	die "Usage:\ni2b2_relations_scorer.pl <PROPOSED_ANSWERS> <ANSWER_KEY>\n";
 }
 
 my $PROPOSED_ANSWERS_FILE_NAME = $ARGV[0];
 my $ANSWER_KEYS_FILE_NAME      = $ARGV[1];
-my $NONE_PRESENT = $ARGV[2];
-
-if ($NONE_PRESENT != 1 and $NONE_PRESENT != 0) {
-  die "Enter 0 for case when None class is not present, enter 1 for None class being present as a relation";}
+my $NONE_PRESENT = 1;
+#my $NONE_PRESENT = $ARGV[2];
+# We are going to assume that None is present in the files and that we are going to 
+# ignore their presence in our calculations. But at the same time, we would like to 
+# report performance on extraction itself
+#if ($NONE_PRESENT != 1 and $NONE_PRESENT != 0) {
+#  die "Enter 0 for case when None class is not present, enter 1 for None class being present as a relation";}
 ################
 ###   MAIN   ###
 ################
 
-my (%confMatrix8way) = ();
+my (%confMatrix8way, %confMatrix2way) = ();
 my (%idsProposed, %idsAnswer) = ();
-my (%allLabels8wayAnswer) = ();
-my (%allLabels8wayProposed) = ();
+my (%allLabels8wayAnswer, %allLabels2wayAnswer) = ();
+my (%allLabels8wayProposed, %allLabels2wayProposed) = ();
 
 ### 1. Read the file contents
 my $totalProposed = &readFileIntoHash($PROPOSED_ANSWERS_FILE_NAME, \%idsProposed);
@@ -100,6 +103,14 @@ foreach my $id (keys %idsProposed) {
 	$confMatrix8way{$labelProposed}{$labelAnswer}++;
 	$allLabels8wayProposed{$labelProposed}++;
 
+	### 2.3. Update the 2-way confusion matrix
+	my $labelProposed2way = $idsProposed{$id};
+	my $labelAnswer2way   = $idsAnswer{$id};
+	$labelProposed2way = &getrelationexistance($labelProposed2way);
+	$labelAnswer2way = &getrelationexistance($labelAnswer2way);
+	$confMatrix2way{$labelProposed2way}{$labelAnswer2way}++;
+	$allLabels2wayProposed{$labelProposed2way}++;
+
 
 }
 
@@ -110,6 +121,10 @@ foreach my $id (keys %idsAnswer) {
 	my $labelAnswer = $idsAnswer{$id};
 	$allLabels8wayAnswer{$labelAnswer}++;
 
+	### 3.2. Update the 2-way answer distribution
+	my $labelAnswer2way = $labelAnswer;
+	$labelAnswer2way = &getrelationexistance($labelAnswer2way);
+	$allLabels2wayAnswer{$labelAnswer2way}++;
 }
 
 ### 4. Check for proposed classes that are not contained in the answer key file: this may happen in cross-validation
@@ -126,7 +141,13 @@ print "<<< 8-WAY EVALUATION >>>:\n\n";
 
 my ($microF1, $microF1_ProbTreat, $microF1_ProbTest, $microF1_ProbProb) = &evaluate(\%confMatrix8way, \%allLabels8wayProposed, \%allLabels8wayAnswer, $totalProposed, $totalAnswer, $NONE_PRESENT);
 
+if ($NONE_PRESENT == 1) {
+	print "<<< 2-WAY EVALUATION >>>:\n\n";
+	&printConfusionMatrix(\%confMatrix2way, \%allLabels2wayProposed, \%allLabels2wayAnswer, $totalProposed, $totalAnswer);
 
+	my ($microF1twoway) = &evaluate2Way(\%confMatrix2way, \%allLabels2wayProposed, \%allLabels2wayAnswer, $totalProposed, $totalAnswer);
+	printf "<<< The 2-way evaluation: micro-averaged F1 = %0.2f%s >>>\n", $microF1twoway, '%';
+}
 
 ### 7. Output the 4 micro F1 values
 printf "<<< The 8-way evaluation: micro-averaged F1 = %0.2f%s >>>\n", $microF1, '%';
@@ -150,10 +171,23 @@ sub getIDandLabel() {
 	if (($label eq 'TrIP') || ($label eq 'TrWP') || ($label eq 'TrCP') ||
 		($label eq 'TrAP') || ($label eq 'TrNAP') || ($label eq 'TeRP') ||
 		($label eq 'TeCP')   || ($label eq 'PIP') || ($label eq 'TrP-None') || 
-		($label eq 'TeP-None') || ($label eq 'PP-None'));
+		($label eq 'TeP-None') || ($label eq 'PP-None') || ($label eq 'None'));
 	
 	return (-1, ());
 }
+
+sub getrelationexistance() {
+	my ($label) = @_;
+	return 'Exist'
+		if (($label eq 'TrIP') || ($label eq 'TrWP') || ($label eq 'TrCP') ||
+			($label eq 'TrAP') || ($label eq 'TrNAP') || ($label eq 'TeRP') ||
+			($label eq 'TeCP')   || ($label eq 'PIP'));
+	return 'NotExist' 
+		if (($label eq 'TrP-None') || ($label eq 'TeP-None') || 
+			($label eq 'PP-None') || ($label eq 'None'));
+      return ();
+}
+
 
 sub getThreeWayEval() {
       my ($label) = @_;
@@ -303,7 +337,7 @@ sub evaluate(){
 			 "%     F1 = ", $F1, '%';
 
 		### 8.5. Accumulate statistics for micro/macro-averaging
-                if (($NONE_PRESENT == 0) or ($NONE_PRESENT == 1 and !($labelAnswer eq 'TrP-None') and !($labelAnswer eq 'TeP-None') and !($labelAnswer eq 'PP-None'))){
+                if (($NONE_PRESENT == 0) or ($NONE_PRESENT == 1 and !($labelAnswer eq 'None') and !($labelAnswer eq 'TrP-None') and !($labelAnswer eq 'TeP-None') and !($labelAnswer eq 'PP-None'))){
 		$macroP  += $P;
 		$macroR  += $R;
 		$macroF1 += $F1;
@@ -416,11 +450,73 @@ sub evaluate(){
 }
 
 
+sub evaluate2Way(){
+	my ($confMatrix, $allLabelsProposed, $allLabelsAnswer, $totalProposed, $totalAnswer) = @_;
+	### 8. Output P, R, F1 for each relation
+	my ($macroP, $macroR, $macroF1) = (0, 0, 0);
+	my ($microCorrect, $microProposed, $microAnswer) = (0, 0, 0);
+	
+	print "\nResults for the individual relations:\n";
+	foreach my $labelAnswer (sort keys %{$allLabelsAnswer}) {
+
+
+		### 8.1. Prevent Perl complains about unintialized values
+		if (!defined($$allLabelsProposed{$labelAnswer})) {
+			$$allLabelsProposed{$labelAnswer} = 0;
+		}
+
+		### 8.1. Calculate P/R/F1
+		my $P  = (0 == $$allLabelsProposed{$labelAnswer}) ? 0
+				: 100.0 * $$confMatrix{$labelAnswer}{$labelAnswer} / $$allLabelsProposed{$labelAnswer};
+		my $R  = (0 == $$allLabelsAnswer{$labelAnswer}) ? 0
+				: 100.0 * $$confMatrix{$labelAnswer}{$labelAnswer} / $$allLabelsAnswer{$labelAnswer};
+		my $F1 = (0 == $P + $R) ? 0 : 2 * $P * $R / ($P + $R);
+
+		### 8.3. Output P/R/F1
+		printf "%25s%s%4d%s%4d%s%6.2f", $labelAnswer,
+			" :    P = ", $$confMatrix{$labelAnswer}{$labelAnswer}, '/', $$allLabelsProposed{$labelAnswer}, ' = ', $P;
+		printf"%s%4d%s%4d%s%6.2f%s%6.2f%s\n",
+		  	 "%     R = ", $$confMatrix{$labelAnswer}{$labelAnswer}, '/', $$allLabelsAnswer{$labelAnswer},   ' = ', $R,
+			 "%     F1 = ", $F1, '%';
+
+		### 8.5. Accumulate statistics for micro/macro-averaging
+		$macroP  += $P;
+		$macroR  += $R;
+		$macroF1 += $F1;
+		$microCorrect += $$confMatrix{$labelAnswer}{$labelAnswer};
+		$microProposed += $$allLabelsProposed{$labelAnswer};
+		$microAnswer += $$allLabelsAnswer{$labelAnswer};
+	}
+	
+	### 9. Output the micro-averaged and macro averaged P, R, F1 for 8 way eval
+	my $microP  = (0 == $microProposed)    ? 0 : 100.0 * $microCorrect / $microProposed;
+	my $microR  = (0 == $microAnswer)      ? 0 : 100.0 * $microCorrect / $microAnswer;
+	my $microF1 = (0 == $microP + $microR) ? 0 :   2.0 * $microP * $microR / ($microP + $microR);
+        print "\nMicro-averaged result :\n";
+	printf "%s%4d%s%4d%s%6.2f%s%4d%s%4d%s%6.2f%s%6.2f%s\n",
+		      "P = ", $microCorrect, '/', $microProposed, ' = ', $microP,
+		"%     R = ", $microCorrect, '/', $microAnswer, ' = ', $microR,
+		"%     F1 = ", $microF1, '%';
+
+	my $distinctLabelsCnt = keys %{$allLabelsAnswer}; 
+	
+
+	$macroP  /= $distinctLabelsCnt; # first divide by the number of categories
+	$macroR  /= $distinctLabelsCnt;
+	$macroF1 /= $distinctLabelsCnt;
+	print "\nMACRO-averaged result :\n";
+	printf "%s%6.2f%s%6.2f%s%6.2f%s\n\n\n\n", "P = ", $macroP, "%\tR = ", $macroR, "%\tF1 = ", $macroF1, '%';
+	
+	
+	return ($microF1);
+}
 sub getShortRelName() {
 	my ($relName) = @_;
 	return 'TeP-N' if ($relName eq 'TeP-None');
 	return 'TrP-N' if ($relName eq 'TrP-None');
 	return 'PP-N' if ($relName eq 'PP-None');
+	return 'Ex' if ($relName eq 'Exist');
+	return 'N-Ex' if ($relName eq 'NotExist');
 	return $relName;
 }
 
