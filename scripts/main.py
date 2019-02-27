@@ -63,7 +63,7 @@ elif config.dataset == 'i2b2':
     #TODO: insert folds information; for now just have dummy folds
     folds = 5
     evaluation_metric_print = 'micro_f1'
-    accumulated_metrics_print = '<micro_f1: (8way, Prob-Treat, Prob-Test, Prob-Prob)>'
+    accumulated_metrics_print = '<micro_f1: (8way, 2way, Prob-Treat, Prob-Test, Prob-Prob) all without None>'
 
 
 config.train_text_dataset_path = 'train{post}.txt'.format(post=post)

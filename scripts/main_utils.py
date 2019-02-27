@@ -149,7 +149,7 @@ def read_macro_f1_from_result_file_ddi(result_filepath):
         result_file.close()
         return macro_f1_5way_with_none, macro_f1_5way_without_none, macro_f1_2way
 
-def read_macro_f1_from_result_file_i2b2(result_filepath):
+def read_micro_f1_from_result_file_i2b2(result_filepath):
         '''
         Retrieve the macro F1 score from the result file that perl eval/i2b2_relations_scorer.pl generates
         '''
@@ -171,8 +171,12 @@ def read_macro_f1_from_result_file_i2b2(result_filepath):
                         cur_line = cur_line.replace('<<< The Problem-Problem evaluation: micro-averaged F1 = ','')
                         cur_line = cur_line.replace('% >>>','')
                         micro_f1_probprob = float(cur_line)
+            if cur_line.startswith('<<< The 2-way evaluation:'):
+                        cur_line = cur_line.replace('<<< The 2-way evaluation: micro-averaged F1 = ','')
+                        cur_line = cur_line.replace('% >>>','')
+                        micro_f1_2way = float(cur_line)
         result_file.close()
-        return micro_f1_8way, micro_f1_probtreat, micro_f1_probtest, micro_f1_probprob
+        return micro_f1_8way, micro_f1_2way, micro_f1_probtreat, micro_f1_probtest, micro_f1_probprob
 
 #read the macro F1 from the necessary filepath
 def evaluate(result_filepath, answer_filepath, relation_dict, data_orin, preds, dataset):
@@ -201,6 +205,6 @@ def evaluate(result_filepath, answer_filepath, relation_dict, data_orin, preds, 
                 read_macro_f1_from_result_file_ddi(result_filepath)
         return macro_f1_5way_with_none, macro_f1_5way_without_none, macro_f1_2way
     elif dataset == 'i2b2':
-        micro_f1_8way, micro_f1_probtreat, micro_f1_probtest, micro_f1_probprob = \
-                read_macro_f1_from_result_file_i2b2(result_filepath)
-        return micro_f1_8way, micro_f1_probtreat, micro_f1_probtest, micro_f1_probprob
+        micro_f1_8way, micro_f1_2way, micro_f1_probtreat, micro_f1_probtest, micro_f1_probprob = \
+                read_micro_f1_from_result_file_i2b2(result_filepath)
+        return micro_f1_8way, micro_f1_2way, micro_f1_probtreat, micro_f1_probtest, micro_f1_probprob
