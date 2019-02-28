@@ -11,7 +11,6 @@ nltk.download('wordnet')
 from nltk import wordnet as wn
 import random
 from spacy.lang.en.stop_words import STOP_WORDS as stop_words
-nlp = spacy.load('en')
 
 #TODO (geeticka) need to clean up utils based upon the methods that are 
 # not directly used by the script anymore

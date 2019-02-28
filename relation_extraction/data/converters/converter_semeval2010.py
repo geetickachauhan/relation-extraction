@@ -8,7 +8,7 @@
 import spacy
 from ast import literal_eval
 import pandas as pd
-nlp = spacy.load('en')
+nlp = spacy.load('en_core_web_lg')
 
 
 relation_dict = {0:'Component-Whole(e2,e1)', 1:'Instrument-Agency(e2,e1)', 2:'Member-Collection(e1,e2)',

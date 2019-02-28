@@ -11,8 +11,9 @@ from ast import literal_eval
 import pandas as pd
 from tqdm import tqdm
 
+import scispacy
 import spacy
-nlp = spacy.load('en')
+nlp = spacy.load('en_core_sci_md')
 
 relation_dict = {0: 'advise', 1: 'effect', 2: 'mechanism', 3: 'int', 4: 'none'}
 rev_relation_dict = {val: key for key, val in relation_dict.items()}
