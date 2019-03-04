@@ -31,8 +31,9 @@ logging.getLogger().setLevel(logging.INFO)
 
 config = parser.get_config()
 
-if not config.preprocessing_type in ['original', 'entity_blinding', 'punct_digit', 'punct_stop_digit']:
-    raise NotImplementedError('Preprocessing types can only be original, entity_blinding, punct_digit or punct_stop_digit')
+if not config.preprocessing_type in ['original', 'entity_blinding', 'punct_digit', 'punct_stop_digit',
+    'ner_blinding']:
+    raise NotImplementedError('Preprocessing types can only be original, entity_blinding, punct_digit, punct_stop_digit or ner_blinding')
 if not config.dataset in ['ddi', 'semeval2010', 'i2b2']:
     raise NotImplementedError('Datasets currently supported are ddi, semeval 2010 or i2b2')
 
