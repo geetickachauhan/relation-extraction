@@ -414,6 +414,13 @@ def get_entity_start_and_end(entity_start, entity_end, tokens):
     e_start = tokens.index(entity_start)
     e_end = tokens.index(entity_end) - 2 # 2 tags will be eliminated
 
+    between_tags = 0
+    for index in range(e_start + 1, e_end + 2): 
+        # we want to check between the start and end for occurence of other tags
+        if tokens[index].endswith('START') or tokens[index].endswith('END'):
+            between_tags += 1
+    e_end -= between_tags
+
     # only eliminate the first occurence of the entity_start and entity_end
     new_tokens = []
     entity_start_seen = 0
