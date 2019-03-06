@@ -9,6 +9,43 @@ sys.path.append('..')
 import time
 import datetime
 import relation_extraction.data.utils as utils
+import parser
+
+# This method performs the work of creating the necessary output folders for the model
+def output_model(config, date_of_experiment_start):
+    train_start_time_in_miliseconds = get_current_time_in_miliseconds()
+    config.train_start_folds.append(train_start_time_in_miliseconds)
+    results, parameters = parser.get_results_dict(config, train_start_time_in_miliseconds)
+    hyperparameters = ['dataset', 'pos_embed_size', 'num_filters', 'filter_sizes', 'keep_prob', 'early_stop', 'patience']
+    hyperparam_dir_addition = '-'.join(['{}_{:.6f}'.format(parameter, parameters[parameter]) if
+            type(parameters[parameter])==float else '{}_{}'.format(parameter,
+                parameters[parameter]) for parameter in hyperparameters])
+
+    #if config.fold is not None and config.cross_validate is True:
+    #    model_name = 'cnn_{0}'.format(config.id + '_' + train_start_time_in_miliseconds +'-'+ 'Fold-'+
+    #        str(config.fold) + hyperparam_dir_addition)
+    #else:
+    model_name = 'cnn_{0}'.format(config.id + '_' + date_of_experiment_start + hyperparam_dir_addition)
+    
+    config.parameters = parameters
+    if config.fold is not None and config.cross_validate is True:
+        folder_string = "CrossValidation"
+        config.output_folder = os.path.join(config.output_dir, "CrossValidation", model_name, 'Fold'+str(config.fold))
+    else:
+        folder_string = "NoCrossValidation"
+        config.output_folder = os.path.join(config.output_dir,"NoCrossValidation", model_name)
+    #config.tensorboard_folder = os.path.join(config.output_dir, "Tensorboard", hyperparam_dir_addition)
+
+    config.tensorboard_folder = config.output_folder
+    config.result_folder = os.path.join(config.output_dir, folder_string, model_name, 'Result')
+    print("Tensorboard folder, for current fold is",
+            config.tensorboard_folder)
+    create_folder_if_not_exists(config.output_folder)
+    create_folder_if_not_exists(config.tensorboard_folder)
+    create_folder_if_not_exists(config.result_folder)
+    config.test_answer_filepath = os.path.join(config.output_folder, config.test_answer_file)
+
+    return results, parameters, model_name
 
 # get the evaluation column as Macro F1 from macro_f1
 def get_eval_column(evaluation_metric_print):

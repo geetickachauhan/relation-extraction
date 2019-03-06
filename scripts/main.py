@@ -16,6 +16,7 @@ import relation_extraction.data.utils as data_utils
 from relation_extraction.data.converters.converter_ddi import relation_dict as ddi_relation_dict
 from relation_extraction.data.converters.converter_i2b2 import relation_dict as i2b2_relation_dict
 from relation_extraction.data.converters.converter_semeval2010 import relation_dict as semeval_relation_dict
+from relation_extraction.models import model_utils
 import main_utils
 #import argparse
 from relation_extraction.models.model import Model
@@ -80,82 +81,6 @@ print("pickled files:", res('pickled-files/seed_{K}_{folds}-fold-border_{N}{post
     N=config.border_size, folds=folds, post=post))
 
 date_of_experiment_start = None
-
-# performs the prediction, but makes sure that if all the scores are negative, predict the class "Other"
-def prediction(scores):
-    data_size = scores.shape[0]
-    pred = np.zeros(data_size)
-    for idx in range(data_size):
-        data_line = scores[idx]
-        if all(data_line <= 0.): # assigning last class which is none or other
-            if config.dataset == 'semeval2010' or config.dataset == 'ddi':
-                pred[idx] = config.classnum 
-        else: # for the i2b2 data, it will do argmax
-            pred[idx] = np.argmax(data_line)
-
-    return pred
-
-# calculates the accuracy since we have a different prediction procedure
-def accuracy(preds, labels):
-    correct = np.equal(preds, labels).astype(np.int8)
-    # correct[labels==18] = 1
-    return correct.sum()
-
-def run_epoch(session, model, batch_iter, epoch, verbose=True, is_training=True):
-    start_time = time.time()
-    acc_count = 0
-    step = 0 #len(all_data)
-    tot_data = 0
-    preds = []
-    scores = []
-
-
-    for batch in batch_iter:
-        step += 1
-        tot_data += batch.shape[0]
-        batch = (x for x in zip(*batch))
-        # because the batch contains the sentences, e1, e2 etc all as separate lists, zip(*) makes it
-        # such that every line of the new tuple contains the first element of sentences, e1, e2 etc
-        sents, relations, e1, e2, dist1, dist2 = batch
-        sents = np.vstack(sents)
-        in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch = model.inputs
-        feed_dict = {in_x: sents, in_e1: e1, in_e2: e2, in_dist1: dist1, in_dist2: dist2, \
-                in_y: relations, in_epoch: epoch}
-        if is_training:
-            _, scores, loss, summary = session.run(
-                [model.train_op, model.scores, model.loss, model.merged_summary],
-                feed_dict=feed_dict
-            )
-            pred = prediction(scores)
-            acc = accuracy(pred, relations)
-            # global_step is not step + epoch*config.batch_size
-            global_step = tf.train.global_step(session, model.global_step)
-            model.writer.add_summary(summary, global_step)
-            # summary, merged_summary
-            acc_count += acc
-            if verbose and step%10 == 0:
-                logging.info(
-                    "  step: %d acc: %.2f%% loss: %.2f time: %.2f"
-                    "" % (
-                        step, acc_count / (step * config.batch_size) * 100, loss,
-                        time.time() - start_time
-                    )
-                )
-        else:
-            #TODO: (geeticka) figure out why merged_summary doesn't exist for the non train model
-            scores, = session.run(
-                    [model.scores],
-                    feed_dict=feed_dict
-            )
-            pred = prediction(scores)
-            acc = accuracy(pred, relations)
-            acc_count += acc
-
-        preds.extend(pred)
-            #global_step = tf.train.global_step(session, model.global_step)
-            #model.writer.add_summary(summary, global_step)
-
-    return acc_count / (tot_data), preds
 
 def init():
 
@@ -283,43 +208,8 @@ def init():
     return embeddings, train_vec, dev_vec, dev_data_orin
 
 
-# This method performs the work of creating the necessary output folders for the model
-def output_model(config):
-    train_start_time_in_miliseconds = main_utils.get_current_time_in_miliseconds()
-    config.train_start_folds.append(train_start_time_in_miliseconds)
-    results, parameters = parser.get_results_dict(config, train_start_time_in_miliseconds)
-    hyperparameters = ['dataset', 'pos_embed_size', 'num_filters', 'filter_sizes', 'keep_prob', 'early_stop', 'patience']
-    hyperparam_dir_addition = '-'.join(['{}_{:.6f}'.format(parameter, parameters[parameter]) if
-            type(parameters[parameter])==float else '{}_{}'.format(parameter,
-                parameters[parameter]) for parameter in hyperparameters])
 
-    #if config.fold is not None and config.cross_validate is True:
-    #    model_name = 'cnn_{0}'.format(config.id + '_' + train_start_time_in_miliseconds +'-'+ 'Fold-'+
-    #        str(config.fold) + hyperparam_dir_addition)
-    #else:
-    model_name = 'cnn_{0}'.format(config.id + '_' + date_of_experiment_start + hyperparam_dir_addition)
-    
-    config.parameters = parameters
-    if config.fold is not None and config.cross_validate is True:
-        folder_string = "CrossValidation"
-        config.output_folder = os.path.join(config.output_dir, "CrossValidation", model_name, 'Fold'+str(config.fold))
-    else:
-        folder_string = "NoCrossValidation"
-        config.output_folder = os.path.join(config.output_dir,"NoCrossValidation", model_name)
-    #config.tensorboard_folder = os.path.join(config.output_dir, "Tensorboard", hyperparam_dir_addition)
-
-    config.tensorboard_folder = config.output_folder
-    config.result_folder = os.path.join(config.output_dir, folder_string, model_name, 'Result')
-    print("Tensorboard folder, for current fold is",
-            config.tensorboard_folder)
-    main_utils.create_folder_if_not_exists(config.output_folder)
-    main_utils.create_folder_if_not_exists(config.tensorboard_folder)
-    main_utils.create_folder_if_not_exists(config.result_folder)
-    config.test_answer_filepath = os.path.join(config.output_folder, config.test_answer_file)
-
-    return results, parameters, model_name
-
-def main():
+def main(date_of_experiment_start):
 
         if config.early_stop is True:
             embeddings, train_vec, dev_vec, dev_data_orin, early_stop_vec, \
@@ -333,7 +223,7 @@ def main():
         # Add some logging
 
 
-        results, parameters, model_name = output_model(config)
+        results, parameters, model_name = main_utils.output_model(config, date_of_experiment_start)
         # above method is general and so below I am adding stff specific to folds
         parameters['fold'] = config.fold
         results['fold'] = config.fold
@@ -377,11 +267,13 @@ def main():
                         if config.early_stop is True:
                             early_stop_iter = data_utils.batch_iter(config.seed, main_utils.stack_data(early_stop_vec), bz, shuffle=False)
                         train_verbosity = True if config.cross_validate is False else False
-                        train_acc, _ = run_epoch(session, m_train, train_iter, epoch, verbose=False)
+                        train_acc, _ = model_utils.run_epoch(session, m_train, train_iter, epoch,
+                                config.batch_size, config.dataset, config.classnum, verbose=False)
 
                         # TODO(geeticka): Why separate model (e.g. why m_eval vs. m_train)?
-                        dev_acc, dev_preds = run_epoch(
-                            session, m_eval, dev_iter, epoch, verbose=False, is_training=False
+                        dev_acc, dev_preds = model_utils.run_epoch(
+                            session, m_eval, dev_iter, epoch, config.batch_size, config.dataset,
+                            config.classnum, verbose=False, is_training=False
                         )
 
                         config.result_filepath = os.path.join(config.output_folder, config.result_file)
@@ -393,8 +285,9 @@ def main():
                                 relation_dict, dev_data_orin, dev_preds, config.dataset)
 
                         if config.early_stop is True:
-                            early_stop_acc, early_stop_preds = run_epoch(
-                                    session, m_eval, early_stop_iter, epoch, verbose=False, is_training=False
+                            early_stop_acc, early_stop_preds = model_utils.run_epoch(
+                                    session, m_eval, early_stop_iter, epoch, config.batch_size,
+                                    config.dataset, config.classnum, verbose=False, is_training=False
                             )
                             early_stop_result_filepath = os.path.join(config.output_folder,
                                     "result-earlystop.txt")
@@ -490,7 +383,7 @@ if __name__ == '__main__':
             for config.fold in range(0, num_folds):
                 start_time = time.time()
                 print('Fold {} Starting!'.format(config.fold))
-                main()
+                main(date_of_experiment_start)
                 end_time = time.time()
                 execution_time = (end_time - start_time)/3600.0 #in hours
                 execution_time = round(execution_time, 2)
@@ -565,7 +458,7 @@ if __name__ == '__main__':
         else:
             ensemble_num = 1
             for ii in range(ensemble_num):
-                    main()
+                    main(date_of_experiment_start)
             end_time = time.time()
             execution_time = (end_time - start_time)/3600.0
             print("ID of the model is", config.id)
