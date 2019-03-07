@@ -19,7 +19,7 @@ from relation_extraction.data.converters.converter_semeval2010 import relation_d
 from relation_extraction.models import model_utils
 import main_utils
 #import argparse
-from relation_extraction.models.model import Model
+from relation_extraction.models.model import CRCNN as Model
 import parser
 
 import copy
@@ -234,10 +234,12 @@ def main(date_of_experiment_start):
             with tf.name_scope("Train"):
                 with tf.variable_scope("Model", reuse=None):
                     m_train = Model(config, embeddings, is_training=True)
+                    m_train.__run__()
 
             with tf.name_scope("Valid"):
                 with tf.variable_scope("Model", reuse=True):
                     m_eval = Model(config, embeddings, is_training=False)
+                    m_eval.__run__()
 
             # Start TensorFlow session
             sv = tf.train.Supervisor(logdir=config.save_path, global_step=m_train.global_step)
