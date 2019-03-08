@@ -52,8 +52,6 @@ parser.add_argument('--seed', default=1, type=int,
 #                                                 help='parameter used by gradient clipping')
 parser.add_argument('--early_stop', default=False, action='store_true',
                                                 help='whether to do early stop')
-parser.add_argument('--remove_stop_words', default=False, action='store_true',
-                                                 help='whether to send all stop words to 0 index')
 parser.add_argument('--low_freq_thresh', default=0, type=int,
                                                  help='what frequency of word to send to 0 index')
 

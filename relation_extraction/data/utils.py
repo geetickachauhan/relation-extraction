@@ -120,7 +120,7 @@ def load_data(file_list):
         return sentences, relations, e1_pos, e2_pos
 
 #stores the words with an index in the corpus organized from largest frequency to lowest frequency
-def build_dict(sentences, remove_stop_words=False, low_freq_thresh=0):
+def build_dict(sentences, low_freq_thresh=0, remove_stop_words=False):
     word_count = Counter()
     for sent in sentences:
         if sent is not None:
