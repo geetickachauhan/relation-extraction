@@ -369,7 +369,7 @@ if __name__ == '__main__':
                 sort_keys=True)
         
         ### Dumping the CSV file
-        dump_csv(config, num_folds, '_crossval')
+        main_utils.dump_csv(config, num_folds, '_crossval')
     else:
         ensemble_num = 1
         for ii in range(ensemble_num):
@@ -378,4 +378,4 @@ if __name__ == '__main__':
         execution_time = (end_time - start_time)/3600.0
         print("ID of the model is", config.id)
         print("Execution time (in hr): ", execution_time)
-        dump_csv(config, num_folds, '_nocrossval')
+        main_utils.dump_csv(config, num_folds, '_nocrossval')
