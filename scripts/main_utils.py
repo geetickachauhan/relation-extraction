@@ -18,7 +18,7 @@ TRAIN, DEV, TEST = 0, 1, 2
 # Dump the CSV file, postfix is to specify whether this is cross val, on test data or just a dev set
 def dump_csv(config, num_folds, postfix=''):
     config.final_result_folder = os.path.join(config.output_dir, 'Final_Result')
-    main_utils.create_folder_if_not_exists(config.final_result_folder)
+    create_folder_if_not_exists(config.final_result_folder)
     final_result_path = os.path.join(config.final_result_folder, 'final_result'+ postfix + '.csv')
     if config.hyperparam_tuning_mode is True:
         final_result_path = os.path.join(config.final_result_folder, 'final_result_hyperparam'+ postfix + '.csv')
@@ -29,7 +29,7 @@ def dump_csv(config, num_folds, postfix=''):
         if 'Unnamed: 0' in result_dataframe.columns:
             result_dataframe.drop('Unnamed: 0', axis=1, inplace=True)
     else:
-        eval_column = main_utils.get_eval_column(evaluation_metric_print)
+        eval_column = get_eval_column(evaluation_metric_print)
         # need to change below to Fold, parameters, eval_metric
         columns = [
             'Fold Number', eval_column, 'Parameters', 'Train Start Time', 'Hyperparam Tuning Mode',
@@ -72,8 +72,8 @@ def get_maximum_entity_and_sentence_length(data, early_stop):
 
     if early_stop is True:
         max_len_earlystop = max_sent_len(data['early_stop'][0])
-        max_e1_len_earlystop = main_utils.max_ent_len(data['early_stop'][2])
-        max_e2_len_earlystop = main_utils.max_ent_len(data['early_stop'][3])
+        max_e1_len_earlystop = max_ent_len(data['early_stop'][2])
+        max_e2_len_earlystop = max_ent_len(data['early_stop'][3])
         max_len = max(max_len, max_len_earlystop)
         max_e1_len = max(max_e1_len, max_e1_len_earlystop)
         max_e2_len = max(max_e2_len, max_e2_len_earlystop)

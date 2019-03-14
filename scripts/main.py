@@ -378,4 +378,4 @@ if __name__ == '__main__':
         execution_time = (end_time - start_time)/3600.0
         print("ID of the model is", config.id)
         print("Execution time (in hr): ", execution_time)
-        main_utils.dump_csv(config, num_folds, '_nocrossval')
+        main_utils.dump_csv(config, 1, '_nocrossval')
