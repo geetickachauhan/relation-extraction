@@ -12,7 +12,6 @@ from nltk import wordnet as wn
 import random
 import h5py # conda install -c conda-forge h5py
 from spacy.lang.en.stop_words import STOP_WORDS as stop_words
-nlp = spacy.load('en')
 
 #TODO (geeticka) need to clean up utils based upon the methods that are
 # not directly used by the script anymore
@@ -58,276 +57,59 @@ def get_only_number(string):
     return ''.join(re.findall("^.*_(\d+)$", string))
     #return " ".join(re.findall("[0-9]+", string))
 
-def get_indiv_pos(position, words_num_dict, words_new_num_dict):
-    if str(position) not in words_num_dict:
-        return None
-    word = words_num_dict[str(position)]
-    return words_new_num_dict[word]
-
-def get_new_entity_position(words, e1_pos, e2_pos, numbers):
-    d1 = {numbers[i]: word for i, word in enumerate(words)} # words_num_dict
-    d2 = {word: i for i, word in enumerate(words)} # words_new_num_dict
-    # TODO: new_position may include just one word inside of the entities
-    # which means that some word between the start and end might be in the path
-    #i.e. we need to check for every entity word if None is returned by get_indiv_pos
-    # because exactly one word's val returned will not be None
-    for i in range(e1_pos[0], e1_pos[1] + 1):
-        new_pos = get_indiv_pos(i, d1, d2)
-        if new_pos is not None:
-            new_e1_pos = (new_pos, new_pos)
-    for i in range(e2_pos[0], e2_pos[1] + 1):
-        new_pos = get_indiv_pos(i, d1, d2)
-        if new_pos is not None:
-            new_e2_pos = (new_pos, new_pos)
-    return new_e1_pos, new_e2_pos
-
-# 0 and 11 are opposites
-# 1 and 16 are opposites
-# 2 and 8 are opposites
-# 3 and 10 are opposites
-# 4 and 17 are opposites
-# 5 and 15 are opposites
-# 6 and 12 are opposites
-# 7 and 13 are opposites
-# 9 and 14 are opposites
-# 18 does not have an opposite
-# given a relation as a number, return the number of the opposite relation
-def give_reverse_relation(relation):
-    reverse_dict = {0: 11, 11:0, 1:16, 16:1, 2:8, 8:2, 3:10, 10:3, 4:17,
-                    17:4, 5:15, 15:5, 6:12, 12:6, 7:13, 13:7, 9:14, 14:9, 18:18}
-    return reverse_dict[relation]
-
-# get the length of the shortest path between two entities
-# in a graph. If path does not exist, returns None
-def get_path_length(entity1, entity2, graph):
-    # sometimes the entities don't exist in the graph altogether because maybe they have no
-    # connections with the other words in the sentence
-    if entity1 not in graph:
-        return None
-    if entity2 not in graph:
-        return None
-    if nx.has_path(graph, entity1, entity2):
-        length = nx.shortest_path_length(graph, source=entity1, target=entity2)
-        return length
-    else:
-        return None
-
-# given the shortest path and graph, get the path with the dependency
-# features i.e. for a path ['name_2', 'is_3'], the returned value will be
-# ['name_2', 'ROOT', 'is_3']
-# This isn't used by data augmentation, but is going to be used by the CNN model
-# to featurize the dependency labels
-def get_path_with_edge_name(graph, path):
-    edge_attributes = nx.get_edge_attributes(graph, 'name')
-    path_with_edge_names = []
-    path_with_edge_names_onlywords = [] # to have the option to get the words without the nums
-    for i in range(0, len(path)-1):
-        path_with_edge_names.append(path[i])
-        path_with_edge_names_onlywords.append(get_only_word(path[i]))
-        w1 = path[i]
-        w2 = path[i+1]
-        edge = edge_attributes[(w1,w2) if (w1,w2) in edge_attributes else (w2,w1)]\
-                + "_" + (str(0) if (w1,w2) in edge_attributes else str(1))
-        path_with_edge_names.append(edge)
-        path_with_edge_names_onlywords.append(edge)
-    path_with_edge_names.append(path[-1])
-    path_with_edge_names_onlywords.append(get_only_word(path[-1]))
-    return path_with_edge_names, path_with_edge_names_onlywords
 
 def stringify_tokenized(tokenizedSentence):
     return " ".join(tokenizedSentence)
 
-# given a tokenized sentence eg: ["The", "bear", "ran", "home"] and
-# positions of the two entities, get the shortest dependency path between
-# both entities
-# in case of multi word entities, grabs the min path length between all possible
-# words in the entities. It is possible to have no shortest dependency path
-# between two entities, in which case None, None is returned
-def get_shortest_dependency_path(tokenizedSentence, e1_pos, e2_pos):
-    #sentence = stringify_tokenized(tokenizedSentence)
-    #parsedData = parser(sentence)
-    # specify a pre-tokenized sentence to spacy and run parts of the pipeline
-    doc = Doc(nlp.vocab, words=tokenizedSentence)
-    nlp.tagger(doc)
-    nlp.parser(doc)
-    edges = []
-    #print("Tokenized Sentence, e1, e2", tokenizedSentence, e1_pos, e2_pos)
-    # it is possible that spacy is giving extra tokens to the sentence than are needed
-    # which means at this stage we need to make sure that we remove those from the
-    # parsedData before we tokenize everything or just adjust the indexes
-    for token in doc:
-        # FYI https://spacy.io/docs/api/token
-        for child in token.children:
-            edges.append(('{0}_{1}'.format(token.lower_,token.i), #head
-                          '{0}_{1}'.format(child.lower_,child.i), #child
-                         {'name': token.dep_})) #name of the dependency
-            #print("appending edges", token.lower_, token.i, child.lower_, child.i, token.dep_)
+# given a tokenized and splitted sentence
+def sentence_replace(sentence, positions, string_update):
+    return sentence[:positions[0]] + [string_update] + sentence[positions[1]+1:]
 
-    graph = nx.Graph(edges)
-    entity1 = [tokenizedSentence[e1_pos[i]]+ "_" + str(e1_pos[i]) for i in range(0, len(e1_pos))]
-    entity2 = [tokenizedSentence[e2_pos[i]]+ "_" + str(e2_pos[i]) for i in range(0, len(e2_pos))]
-    path_length = []
-    for e1 in entity1:
-        for e2 in entity2:
-            length = get_path_length(e1, e2, graph)
-            if length is not None:
-                path_length.append({'len': length, 'e1': e1, 'e2': e2})
-    if not path_length: # means list is empty which means that path didnt exist at all
-        return None, None, None
-    minItem = min(path_length, key=lambda x: x['len'])
-    path = nx.shortest_path(graph, source=minItem['e1'], target=minItem['e2'])
-    path_with_edge_names, path_with_edge_names_onlywords = get_path_with_edge_name(graph, path)
-    return path, path_with_edge_names, path_with_edge_names_onlywords
+# sentence is the sentence to update and entity positions is a list of entity positions
+def per_sentence_replacement_ddi(sentence, entity_positions):
+    # if entity position is updated, then all positions after it also have to be updated
+    
+    e0_pos = entity_positions[0]
+    sentence = sentence_replace(sentence, e0_pos, 'DRUG1')
+    new_e0_pos = (e0_pos[0], e0_pos[0])
+   
+    entity_positions[0] = new_e0_pos
+    diff = e0_pos[1] - e0_pos[0] # if the entity is 2 word, then move every other e_pos down by 1
+    if entity_positions[0] == entity_positions[1]: # if both entities are the same
+        entity_positions[1] = new_e0_pos
+        return sentence, entity_positions
+    if diff > 0:
+        for i in range(1, len(entity_positions)):
+            e_pos = entity_positions[i]
+            if e_pos[0] > e0_pos[1]:
+                entity_positions[i] = (entity_positions[i][0] - diff, entity_positions[i][1] - diff)
+     
+    e1_pos = entity_positions[1]
+    sentence = sentence_replace(sentence, e1_pos, 'DRUG2')
+    new_e1_pos = (e1_pos[0], e1_pos[0])
+    
+    entity_positions[1] = new_e1_pos
+    diff = e1_pos[1] - e1_pos[0]
+    if diff > 0 and len(entity_positions) > 2:
+        for i in range(2, len(entity_positions)):
+            e_pos = entity_positions[i]
+            if e_pos[0] > e1_pos[1]:
+                entity_positions[i] = (entity_positions[i][0] - diff, entity_positions[i][1] - diff)
+    # then should handle for the case when there are more than entity 1 and entity 2 i.e. drug0 (any other drug)
+    return sentence, entity_positions
 
-# given splitted training/ testing data, return the paths, paths_e1_pos etc for the data
-def shortest_dependency_path_full_data(data):
-    sentences = data[0]
-    relations = data[1]
-    e1_pos = data[2]
-    e2_pos = data[3]
-    paths = []
-    paths_with_edge_names = []
-    paths_e1_pos = []
-    paths_e2_pos = []
-    for idx, (sent, pos1, pos2, rel) in enumerate(zip(sentences, e1_pos, e2_pos, relations)):
-        path, _, path_with_edge_names = get_shortest_dependency_path(sent, pos1, pos2)
-        if path is not None:
-            oldnums = [get_only_number(word) for word in path]
-            path = [get_only_word(word) for word in path]
-            path_pos1, path_pos2 = get_new_entity_position(path, pos1, pos2, oldnums)
-        else:
-            path = None
-            path_pos1 = None
-            path_pos2 = None
-        paths.append(path)
-        paths_e1_pos.append(path_pos1)
-        paths_e2_pos.append(path_pos2)
-        paths_with_edge_names.append(path_with_edge_names)
-    return paths, paths_e1_pos, paths_e2_pos, paths_with_edge_names
-
-# given splitted training data, extend it by reversing the sentences and give the relevant pos embeddings
-# if simple is false, augment the data with the shortest dependency path between the entities
-def augment_data(data, simple=True):
-    sentences = data[0]
-    relations = data[1]
-    e1_pos = data[2]
-    e2_pos = data[3]
-    paths = data[4]
-    paths_e1_pos = data[5]
-    paths_e2_pos = data[6]
-    augmented_sentences = []
-    augmented_relations = []
-    augmented_e1_pos = []
-    augmented_e2_pos = []
-    augmented_relations = []
-    for idx, (sent, pos1, pos2, rel, path, path_pos1, path_pos2) in enumerate(zip(sentences,\
-            e1_pos, e2_pos, relations, paths, paths_e1_pos, paths_e2_pos)):
-        if simple is True: # in this case everything is reversed
-            augmented_sent = list(reversed(sent))
-            augmented_rel = give_reverse_relation(rel)
-            augmented_pos1_first = len(sent) - (pos2[1] + 1)
-            augmented_pos1_second = len(sent) - (pos2[0] + 1)
-            augmented_pos2_first = len(sent) - (pos1[1] + 1)
-            augmented_pos2_second = len(sent) - (pos1[0] + 1)
-            augmented_pos1 = (reversed_pos1_first, reversed_pos1_second)
-            augmented_pos2 = (reversed_pos2_first, reversed_pos2_second)
-        else: # in this case only the shortest dependency path is considered
-            #print("Sentence", sent)
-            #path = get_shortest_dependency_path(sent, pos1, pos2)[0]
-            if path is None:
-                continue
-            #print("Path", path)
-            #oldnums = [get_only_number(word) for word in path]
-            #print("Old indexing", oldnums)
-            #augmented_sent = [get_only_word(word) for word in path]
-            #augmented_pos1, augmented_pos2 = get_new_entity_position(augmented_sent, pos1, pos2, oldnums)
-            #augmented_rel = rel
-            augmented_sent = path
-            augmented_pos1 = path_pos1
-            augmented_pos2 = path_pos2
-            augmented_rel = rel
-        augmented_sentences.append(augmented_sent)
-        augmented_relations.append(augmented_rel)
-        augmented_e1_pos.append(augmented_pos1)
-        augmented_e2_pos.append(augmented_pos2)
-    sentences = sentences + augmented_sentences
-    relations = relations + augmented_relations
-    e1_pos = e1_pos + augmented_e1_pos
-    e2_pos = e2_pos + augmented_e2_pos
-
-    return sentences, relations, e1_pos, e2_pos
-
-
-#input must be a tokenized sentence in the form ['There', 'is', 'a', 'dog', '.']
-def get_hypernyms_per_sentence(tokenizedSentence):
-    hypernyms = []
-    for word in tokenizedSentence:
-        hypernym_perword = []
-        if len(wn.wordnet.synsets(word)) == 0:
-            hypernyms.append("")
-            continue
-        foundhypernym = 0
-        for synset in wn.wordnet.synsets(word):
-            if len(synset.hypernyms()) > 0:
-                hypernym = synset.hypernyms()[0]
-                foundhypernym += 1
-                hypernyms.append(hypernym.name())
-                break
-        if foundhypernym == 0:
-            hypernyms.append("")
-    return hypernyms
-
-
-# This function generates the hypernyms of a tokenized sentence and splits out only the words
-# it has a flag to indicate whether to give only the first word or all of them
-def get_hypernyms_per_sentence_onlywords(tokenizedSentence, onlyFirstWord=False):
-    #print("Only getting the hypernyms for the words")
-    hypernyms = get_hypernyms_per_sentence(tokenizedSentence)
-    hypernyms_onlywords = []
-    for hypernym in hypernyms:
-        if hypernym == '':
-            hypernyms_onlywords.append(hypernym)
-            continue
-        word = " ".join(re.findall("[a-zA-Z]+", hypernym))
-        last_character = word[len(word)-1:]
-        if(last_character == 'v' or last_character == 'n' or last_character == 'a' or last_character == 'r'):
-            word = word[:len(word)-1]
-            word = word.strip()
-        if onlyFirstWord == True:
-            #print("Only the first word is being extracted")
-            word = word.split()[0]
-        hypernyms_onlywords.append(word)
-    return hypernyms_onlywords
-
-#given data in the form of split_data_cut_sentences output, return the hypernyms of the
-# entities, onlyWordsAndFirstWord is a flag to indicate whether you want only the words of the hypernyms
-# and if you want only the first word from that eg: in travel_rapidly.v.01, when both flags are true,
-# you would get 'travel' as the hypernym
-def get_hypernyms(data, onlyWordsAndFirstWord=[False, False]):
-    sentences = data[0]
-    e1_pos = data[2]
-    e2_pos = data[3]
-    num_data = len(sentences)
-
-    e1_hypernym = []
-    e2_hypernym = []
-    for idx, (sent, pos1, pos2) in enumerate(zip(sentences, e1_pos, e2_pos)):
-        e1 = [sent[x] for x in range(pos1[0], pos1[1]+1)]
-        e2 = [sent[x] for x in range(pos2[0], pos2[1]+1)]
-        if onlyWordsAndFirstWord[0] == True:
-            hyp1 = get_hypernyms_per_sentence_onlywords(e1, onlyWordsAndFirstWord[1])
-            hyp2 = get_hypernyms_per_sentence_onlywords(e2, onlyWordsAndFirstWord[1])
-        else:
-            hyp1 = get_hypernyms_per_sentence(e1)
-            hyp2 = get_hypernyms_per_sentence(e2)
-        #hyp1 = " ".join(map(str, hyp1))
-        #e1_hypernym[idx, :len(hyp1)] = hyp1
-        e1_hypernym.append(hyp1)
-        #hyp2 = " ".join(map(str, hyp2))
-        e2_hypernym.append(hyp2)
-        #e2_hypernym[idx, :len(hyp2)] = get_hypernyms_per_sentence(e2)
-    return e1_hypernym, e2_hypernym
-
+# replace by DRUG1, DRUG2
+def replace_by_drug_ddi(data):
+    sentences, relations, e1_pos, e2_pos = data
+    new_sentences = []
+    new_e1_pos = []
+    new_e2_pos = []
+    for (sent, pos1, pos2) in zip(sentences, e1_pos, e2_pos):
+        new_sent, new_positions = per_sentence_replacement_ddi(sent, [pos1, pos2])
+        new_sentences.append(new_sent)
+        new_e1_pos.append(new_positions[0])
+        new_e2_pos.append(new_positions[1])
+    return new_sentences, relations, new_e1_pos, new_e2_pos
 
 def load_data(file_list):
         sentences = []
@@ -347,7 +129,7 @@ def load_data(file_list):
         return sentences, relations, e1_pos, e2_pos
 
 #stores the words with an index in the corpus organized from largest frequency to lowest frequency
-def build_dict(sentences, remove_stop_words=False, low_freq_thresh=0):
+def build_dict(sentences, low_freq_thresh=0, remove_stop_words=False):
     word_count = Counter()
     for sent in sentences:
         if sent is not None:
@@ -467,16 +249,6 @@ def load_embedding(config, word_dict, normalize=False):
 
                 return embeddings.astype(np.float32)
 
-# change number to 0 if it is larger than a cap
-def threshold(num, cap):
-    if(num > cap):
-        return 0
-    return num
-
-# vectorizes a word's hypernym, assuming that it consists of multiple words. Even if there is just one word,
-# it will be treated as a list
-def vectorize_hypernym_word(hyp, hypernym_dict, config):
-    return [threshold(hypernym_dict[h], config.hyp_embed_num) if h!="" and h in hypernym_dict else 0 for h in hyp]
 
 # given the total data length, max sentence length, position of entities, compute the the
 # relative distances of everything with respect to it
@@ -534,12 +306,12 @@ def vectorize(config, data, word_dict):
     print('max sen len: {}, local max e1 len: {}, local max e2 len: {}'.format(max_sen_len, local_max_e1_len, local_max_e2_len))
 
     if config.use_elmo is True: padded_elmo_embeddings = pad_elmo_embedding(max_sen_len, elmo_embeddings)
+    
     # maximum values needed to decide the dimensionality of the vector
     sents_vec = np.zeros((num_data, max_sen_len), dtype=int)
     e1_vec = np.zeros((num_data, max_e1_len), dtype=int)
     e2_vec = np.zeros((num_data, max_e2_len), dtype=int)
     # dist1 and dist2 are defined in the compute distance function
-
 
     for idx, (sent, pos1, pos2) in enumerate(zip(sentences, e1_pos, e2_pos)):
         # all unseen words are mapped to the index 0
