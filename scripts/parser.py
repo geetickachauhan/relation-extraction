@@ -1,14 +1,15 @@
 import argparse
 import copy
 import time
+
 #Arguments that should be provided: dataset: when extending to other datasets this will be useful
 #                                   use_elmo: increases runtime so just for testing don't use
 # Arguments that are commonly provided: cross validate, use_test, use_piecewise_pool
 # boolean arguments should be provided like --cross_validate without any other value
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='semeval2010',
-                                        help='the dataset for which the task is being applied')
-parser.add_argument('--id', default='baseline', # this will get overwritten in the code by uuid
+        help='the dataset for which the task is being applied. Options: semeval2010, ddi')
+parser.add_argument('--id', default='baseline', # this will get overwritten in the code by uuid 
                                         help="a name for identifying the model")
 parser.add_argument('--pos_embed_size', default=25, type=int,
                                         help="position feature embedding size")
@@ -53,8 +54,6 @@ parser.add_argument('--seed', default=1, type=int,
 #                                                 help='parameter used by gradient clipping')
 parser.add_argument('--early_stop', default=False, action='store_true',
                                                 help='whether to do early stop')
-parser.add_argument('--remove_stop_words', default=False, action='store_true',
-                                                 help='whether to send all stop words to 0 index')
 parser.add_argument('--low_freq_thresh', default=0, type=int,
                                                  help='what frequency of word to send to 0 index')
 
@@ -75,15 +74,16 @@ parser.add_argument('--sgd_momentum', default=False, action='store_true', \
 # Misc arguments
 parser.add_argument('--save_path', default=None,
                                                 help='save model here')
-parser.add_argument('--embedding_file', default='/data/medg/misc/semeval_2010/senna/embeddings.txt',
+parser.add_argument('--embedding_file', default='/data/medg/misc/geeticka/relation_extraction/senna/embeddings.txt',
                                                 help='embedding file')
-parser.add_argument('--embedding_vocab', default='/data/medg/misc/semeval_2010/senna/words.lst',
+parser.add_argument('--embedding_vocab', default='/data/medg/misc/geeticka/relation_extraction/senna/words.lst',
                                                 help='embedding vocab file')
-parser.add_argument('--data_root', default="/data/medg/misc/semeval_2010",
+parser.add_argument('--data_root',
+        default="/data/medg/misc/geeticka/relation_extraction/semeval_2010/pre-processed/original/",
                                                 help= "Data root directory")
-parser.add_argument('--train_text_dataset_path', default='train.txt',
+parser.add_argument('--train_text_dataset_path', default='train_original.txt',
                                                 help='test file')
-parser.add_argument('--test_text_dataset_path', default='test.txt',
+parser.add_argument('--test_text_dataset_path', default='test_original.txt',
                                                 help='test file')
 parser.add_argument('--dev_answer_file', default='answers_for_dev.txt',
                                                 help='dev answer file')
@@ -114,12 +114,14 @@ parser.add_argument('--use_piecewise_pool', default=False, action='store_true',
                                                 help='whether to do piecewise max pooling')
 parser.add_argument('--hyperparam_tuning_mode', default=False, action='store_true',
                                                 help='whether hyperparameter tuning mode was on')
+parser.add_argument('--preprocessing_type', default='original', 
+help= 'specify the preprocessing type from original, entity_blinding, punct_digit, punct_stop_digit')
 
 #TODO (geeticka) : below is not needed to include in parser
 parser.add_argument('--fold', default=None, type=int,\
                                                 help='the current fold')
 # TODO(geeticka): Don't add things to argparse unless you want to set them on the command line.
-parser.add_argument('--macro_f1_folds', default=[], type=list,\
+parser.add_argument('--eval_metric_folds', default=[], type=list,\
                                                 help='the list of macro f1s for all folds if folds exist')
 parser.add_argument('--add_hyperparam_details', default=None, type=str, \
                                                 help='a string that contains information about miscellaneous'\
@@ -137,6 +139,7 @@ def get_results_dict(config, train_start_time_in_miliseconds):
     results = {} # this dictionary will contain all the result of the experiment    results['model_options'] = copy.copy(model_options)
     parameters = {}
     parameters['dataset'] = config.dataset
+    parameters['preprocessing_type'] = config.preprocessing_type
     parameters['id'] = config.id
     parameters['pos_embed_size'] = config.pos_embed_size
     parameters['pos_embed_num'] = config.pos_embed_num
