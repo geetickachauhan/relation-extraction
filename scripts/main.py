@@ -79,11 +79,14 @@ else:
     prefix = ''
     mode = 'normal'
 
-dataset = \
-data_utils.Dataset(res(prefix+'pickled-files/seed_{K}_{folds}-fold-border_{N}{post}.pkl').format(K=config.pickle_seed,
-    N=config.border_size, folds=folds, post=post))
-print("pickled files:", res(prefix+'pickled-files/seed_{K}_{folds}-fold-border_{N}{post}.pkl').format(K=config.pickle_seed,
-    N=config.border_size, folds=folds, post=post))
+if config.cross_validate is True:
+    dataset = \
+    data_utils.Dataset(res('pickled-files/seed_{K}_{folds}-fold-border_{N}{post}.pkl').format(K=config.pickle_seed,
+        N=config.border_size, folds=folds, post=post))
+    print("pickled files:", res('pickled-files/seed_{K}_{folds}-fold-border_{N}{post}.pkl').format(K=config.pickle_seed,
+        N=config.border_size, folds=folds, post=post))
+else:
+    dataset = None
 
 date_of_experiment_start = None
 
@@ -375,7 +378,7 @@ if __name__ == '__main__':
                 sort_keys=True)
         
         ### Dumping the CSV file
-        main_utils.dump_csv(config, num_folds, '_crossval')
+        main_utils.dump_csv(config, parameters, num_folds, evaluation_metric_print, '_crossval')
     else:
         ensemble_num = 1
         for ii in range(ensemble_num):
@@ -384,4 +387,6 @@ if __name__ == '__main__':
         execution_time = (end_time - start_time)/3600.0
         print("ID of the model is", config.id)
         print("Execution time (in hr): ", execution_time)
-        main_utils.dump_csv(config, 1, '_nocrossval')
+        parameters, _ = parser.get_results_dict(config, 0) # we don't care about second val and we also don't care about individual training time here
+        parameters['train_start_folds'] = config.train_start_folds
+        main_utils.dump_csv(config, parameters, 1, evaluation_metric_print, '_nocrossval')
