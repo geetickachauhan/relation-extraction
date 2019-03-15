@@ -81,9 +81,9 @@ else:
 
 if config.cross_validate is True:
     dataset = \
-    data_utils.Dataset(res('pickled-files/seed_{K}_{folds}-fold-border_{N}{post}.pkl').format(K=config.pickle_seed,
+    data_utils.Dataset(res(prefix + 'pickled-files/seed_{K}_{folds}-fold-border_{N}{post}.pkl').format(K=config.pickle_seed,
         N=config.border_size, folds=folds, post=post))
-    print("pickled files:", res('pickled-files/seed_{K}_{folds}-fold-border_{N}{post}.pkl').format(K=config.pickle_seed,
+    print("pickled files:", res(prefix + 'pickled-files/seed_{K}_{folds}-fold-border_{N}{post}.pkl').format(K=config.pickle_seed,
         N=config.border_size, folds=folds, post=post))
 else:
     dataset = None
