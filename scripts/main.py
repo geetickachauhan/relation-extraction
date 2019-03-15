@@ -72,12 +72,14 @@ config.train_text_dataset_path = 'train{post}.txt'.format(post=post)
 config.test_text_dataset_path = 'test{post}.txt'.format(post=post)
 def res(path): return os.path.join(config.data_root, path)
 
-
-dataset = \
-data_utils.Dataset(res('pickled-files/seed_{K}_{folds}-fold-border_{N}{post}.pkl').format(K=config.pickle_seed,
-    N=config.border_size, folds=folds, post=post))
-print("pickled files:", res('pickled-files/seed_{K}_{folds}-fold-border_{N}{post}.pkl').format(K=config.pickle_seed,
-    N=config.border_size, folds=folds, post=post))
+if config.cross_validate is True:
+    dataset = \
+    data_utils.Dataset(res('pickled-files/seed_{K}_{folds}-fold-border_{N}{post}.pkl').format(K=config.pickle_seed,
+        N=config.border_size, folds=folds, post=post))
+    print("pickled files:", res('pickled-files/seed_{K}_{folds}-fold-border_{N}{post}.pkl').format(K=config.pickle_seed,
+        N=config.border_size, folds=folds, post=post))
+else:
+    dataset = None
 
 date_of_experiment_start = None
 
