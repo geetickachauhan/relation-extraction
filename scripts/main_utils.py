@@ -17,7 +17,7 @@ import pandas as pd
 TRAIN, DEV, TEST = 0, 1, 2
 
 # Dump the CSV file, postfix is to specify whether this is cross val, on test data or just a dev set
-def dump_csv(config, parameters, num_folds, evaluation_metric_print, postfix=''):
+def dump_csv(config, parameters, num_folds, date, evaluation_metric_print, postfix=''):
     config.final_result_folder = os.path.join(config.output_dir, 'Final_Result')
     create_folder_if_not_exists(config.final_result_folder)
     final_result_path = os.path.join(config.final_result_folder, 'final_result'+ postfix + '.csv')
