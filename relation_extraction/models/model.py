@@ -191,9 +191,9 @@ class CRCNN(object):
             #print("conv shape", conv.shape)
             h = tf.nn.tanh(tf.nn.bias_add(conv,b),name="h"+prefix) # bz, n, 1, dc
             if mode == 'simple_max_pool':
-                bc_pmpool = self.simple_max_pooling(h)
+                bc_pmpool = self.pooling.simple_max_pooling(h)
             else:
-                bc_pmpool = self.piecewise_max_pooling(h)
+                bc_pmpool = self.pooling.piecewise_max_pooling(h)
             pooled_outputs.append(bc_pmpool)
         h_pool_flat = tf.concat(pooled_outputs, -1) # concatenate over the last dimension which is channels
         #print("h_pool_flat", h_pool_flat.shape)

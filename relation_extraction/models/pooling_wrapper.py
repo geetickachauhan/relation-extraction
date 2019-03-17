@@ -6,10 +6,10 @@ class pooling_wrapper(object):
         self.p1_ind = None
         self.p2_ind = None
 
-    def get_num_pieces():
+    def get_num_pieces(self):
         return self.num_pieces
     
-    def assign_splitting_pieces(p1_ind, p2_ind):
+    def assign_splitting_pieces(self, p1_ind, p2_ind):
         self.p1_ind = p1_ind
         self.p2_ind = p2_ind
 
@@ -88,7 +88,7 @@ class pooling_wrapper(object):
 
         # concat is needed below to convert all individual tensors into one tensor
         sliced = tf.squeeze(sliced.concat()) # batch_size, slices, max_sen_len, channels_count
-        sliced = tf.reshape(sliced, [variable_batch_size, num_pieces, max_sen_len, dc])
+        sliced = tf.reshape(sliced, [variable_batch_size, self.num_pieces, max_sen_len, dc])
         bwgc_mpool = tf.nn.max_pool(sliced,
                 ksize=[1, 1, max_sen_len, 1],
                 strides=[1, 1, max_sen_len, 1],

@@ -45,12 +45,12 @@ def run_epoch(session, model, batch_iter, epoch, batch_size, dataset, classnum, 
         sents = np.vstack(sents)
         
         if mode == 'elmo': 
-            in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_elmo = model.inputs
+            in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_elmo, in_pos1, in_pos2 = model.inputs
             feed_dict = {in_x: sents, in_e1: e1, in_e2: e2, in_dist1: dist1, in_dist2: dist2, \
                     in_y: relations, in_epoch: epoch, in_elmo: elmo_embeddings, in_pos1: position1, \
                     in_pos2: position2}
         else:
-            in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch = model.inputs
+            in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_pos1, in_pos2 = model.inputs
             feed_dict = {in_x: sents, in_e1: e1, in_e2: e2, in_dist1: dist1, in_dist2: dist2, \
                     in_y: relations, in_epoch: epoch, in_pos1: position1, in_pos2: position2}
         
