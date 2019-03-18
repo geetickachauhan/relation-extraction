@@ -41,3 +41,15 @@ def get_entity_dict_df_pair_map(df_train, df_test):
     df_train['pair_map'] = df_train.apply(convert_pair_to_dict, args=(needed_dict,), axis=1)
     df_test['pair_map'] = df_test.apply(convert_pair_to_dict, args=(needed_dict,), axis=1)
     return needed_dict, df_train, df_test
+
+# calculate the length of the context
+def length_of_context(row):
+    e1 = row.metadata['e1']['word_index'][0][1]
+    e2 = row.metadata['e2']['word_index'][0][1]
+    distance = abs(int(e1) - int(e2))
+    return distance
+
+# calculate the length of the sentence
+def length_of_sentence(row):
+    tokenized_sentence = row.tokenized_sentence.split()
+    return len(tokenized_sentence)
