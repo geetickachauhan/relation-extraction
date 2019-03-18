@@ -6,6 +6,9 @@ __pycache__/
 # Folders
 output/
 tags
+eval/result.txt
+eval/test.txt
+eval/test_key.txt
 
 # C extensions
 *.so
