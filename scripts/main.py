@@ -58,6 +58,9 @@ elif config.dataset == 'ddi':
     folds = 5
     evaluation_metric_print = 'macro_f1'
     accumulated_metrics_print = '<macro_f1: (5way with none, 5 way without none, 2 way)>'
+    if config.use_piecewise_pool is True:
+        config.data_root += 'piecewise-pool/'
+
 elif config.dataset == 'i2b2':
     relation_dict = i2b2_relation_dict
     config.classnum = max(relation_dict.keys()) + 1 # we do not have an 'other' class here
