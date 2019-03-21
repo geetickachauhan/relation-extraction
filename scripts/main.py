@@ -40,7 +40,7 @@ if not config.dataset in ['ddi', 'semeval2010', 'i2b2']:
 
 
 post = '_' + config.preprocessing_type
-config.data_root = "/data/medg/misc/geeticka/relation_extraction/" + config.dataset + \
+config.data_root = "/crimea/geeticka/data/relation_extraction/" + config.dataset + \
         "/pre-processed/" + config.preprocessing_type + "/"
 
 # eval_metric refers to macro_f1 or micro_f1: it is a more general name to store the metric values
