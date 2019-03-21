@@ -118,8 +118,11 @@ def get_data(res, dataset, cross_validate, train_text_dataset_path, test_text_da
         return tuple(transposed_data)
 
     # setting the train, dev data; pretend that test data does not exist
-    train_text_dataset_file = res(train_text_dataset_path)
-    test_text_dataset_file = res(test_text_dataset_path)
+    #train_text_dataset_file = res(train_text_dataset_path)
+    #test_text_dataset_file = res(test_text_dataset_path)
+    use_dataset = 'ddi'
+    train_text_dataset_file = "/data/medg/misc/geeticka/relation_extraction/" + use_dataset + "/pre-processed/original/" + str(train_text_dataset_path)
+    test_text_dataset_file = "/data/medg/misc/geeticka/relation_extraction/" + use_dataset + "/pre-processed/original/" + str(test_text_dataset_path)
     if cross_validate is False:
         train_data = main_utils.openFileAsList(train_text_dataset_file)
     else:
