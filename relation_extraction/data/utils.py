@@ -300,11 +300,13 @@ def vectorize(config, data, word_dict):
             return pos1[1], pos2[1]
         elif pos1[1] > pos2[1]:
             return pos2[1], pos1[1]
-        else:
+        elif config.use_piecewise_pool is True:
             raise Exception("Entity positions cannot end at the same position for piecewise splitting")
             # I anticipate the above to be a problem for NER blinding, where there are 
             # overlaps between the entity pairs because the existence of the NER label extends the
             # entity pairs
+        else:
+            return pos1[1], pos2[1] # this is not going to be used anyway, but using these is problematic
 
     if config.use_elmo is True: sentences, relations, e1_pos, e2_pos, elmo_embeddings = data
     else: sentences, relations, e1_pos, e2_pos = data
