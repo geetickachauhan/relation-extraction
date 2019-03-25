@@ -9,7 +9,7 @@ from scipy.stats import ttest_rel
 #output_path = '/scratch/geeticka/relation-extraction/output/semeval2010/CrossValidation'
 #def res(path): return os.path.join(output_path, path)
 
-## Below are the methods to gather necessary information from the file
+## Below are the methods to gather necessary information from the results file
 def read_confusion_matrix_per_line(cur_line):
     if re.search(r'.*\|.*', cur_line): # only get those lines which have a pipe operator
         splitted_line = cur_line.strip().split()
@@ -40,8 +40,9 @@ def read_precision_recall_f1(cur_line): # assume that the mode is once we have r
     #if not cur_line.startswith('Micro-averaged result'): # you want to read only up to the point when the relations
     # will need to double check above
 
-def get_file_metrics(result_file_location):
-    result_file = os.path.join(result_file_location, 'result.txt')
+# confusion matrix portion refers to which part of the file to read
+# for eg, this will be <<< (9+1)-WAY EVALUATION TAKING DIRECTIONALITY INTO ACCOUNT -- OFFICIAL >>> for semeval
+def get_file_metrics(num_relations, result_file, confusion_matrix_portion):
     official_portion_file = False
     individual_relations_f1_portion = False
     micro_f1_portion = False
@@ -54,12 +55,16 @@ def get_file_metrics(result_file_location):
     with open(result_file, 'r') as result_file:
         for cur_line in result_file:
             cur_line = cur_line.strip()
-            if cur_line.startswith('<<< (9+1)-WAY EVALUATION TAKING DIRECTIONALITY INTO ACCOUNT -- OFFICIAL >>>'):
+            #if cur_line.startswith('<<< (9+1)-WAY EVALUATION TAKING DIRECTIONALITY INTO ACCOUNT -- OFFICIAL >>>'):
+            if official_portion_file is True and cur_line.startswith('<<<'):
+                break
+            if cur_line.startswith(confusion_matrix_portion):
                 official_portion_file = True
             if official_portion_file is False:
                 continue
             confusion_matrix_line = read_confusion_matrix_per_line(cur_line)
-            if confusion_matrix_line is not None: confusion_matrix_official.append(confusion_matrix_line)
+            if confusion_matrix_line is not None and len(confusion_matrix_official) < num_relations: 
+                confusion_matrix_official.append(confusion_matrix_line)
             
             acc = read_accuracy_per_line(cur_line)
             if acc is not None: accuracy = acc
@@ -116,11 +121,10 @@ def generate_pretty_summary_confusion_matrix(confusion_matrix_df, relation_full_
         confused_with = generate_confused_with_string(index, row, relation_full_form_dictionary, full_form) 
         # short form is the default
         correct_predictions = row[index] # eg: gives the column value for C-E for an index C-E
-        if index != '_O': confused_with_other = row['_O'] # this is specific to semeval and will need to be changed
-        else: confused_with_other = None
-        data.append([actual_label, confused_with, confused_with_other, correct_predictions])
-    columns = pd.Index(['Gold Relation', 'Confused With(num_examples)',
-        'Confused with Other', 'Correct Predictions'], name='summary')
+        #if index != '_O': confused_with_other = row['_O'] # this is specific to semeval and will need to be changed
+        #else: confused_with_other = None
+        data.append([actual_label, confused_with, correct_predictions])
+    columns = pd.Index(['Gold Relation', 'Confused With(num_examples)', 'Correct Predictions'], name='summary')
     pretty_summary_confusion_matrix_df = pd.DataFrame(data=data, columns=columns)
     return pretty_summary_confusion_matrix_df
 
@@ -141,15 +145,15 @@ def create_metrics_macro_micro_df(metrics_macro, metrics_micro):
     return metrics_macro_micro
 
 # Finally, create a large summary function
-def create_summary(result_file_location, relation_full_form_dictionary, relation_as_short_list,
-        full_form=False):
-    if not os.path.exists(result_file_location):
+def create_summary(result_file, relation_full_form_dictionary, relation_as_short_list,
+        confusion_matrix_portion, full_form=False):
+    if not os.path.exists(result_file):
         print("Check your path first!")
         return None
+    num_relations = len(relation_as_short_list)
     # get the file metrics
     confusion_matrix_official, accuracy, \
-    metrics_indiv_relations, metrics_micro, metrics_macro = get_file_metrics(result_file_location)
-    
+    metrics_indiv_relations, metrics_micro, metrics_macro = get_file_metrics(num_relations, result_file, confusion_matrix_portion)
     # get the confusion matrix dataframe
     confusion_matrix_df = get_confusion_matrix_as_df(confusion_matrix_official, relation_as_short_list)
     
@@ -158,6 +162,7 @@ def create_summary(result_file_location, relation_full_form_dictionary, relation
             generate_pretty_summary_confusion_matrix(confusion_matrix_df, relation_full_form_dictionary,
                     full_form)
     total_correct_predictions = pretty_summary_confusion_matrix_df['Correct Predictions'].sum()
+    print(metrics_indiv_relations)
     metrics_indiv_relations_df = create_metrics_indiv_relations_df(metrics_indiv_relations, 
                                                                    relation_full_form_dictionary, 
                                                                    relation_as_short_list)
@@ -175,7 +180,7 @@ def get_sum_confusion_matrix(confusion_matrix):
 
 
 # for each of the relations, do a t test between the two model metrics
-def indiv_metric_comparison(metrics_i_model1, metrics_i_model2, model1_name, model2_name, exclude_other=True):
+def indiv_metric_comparison(dataset, metrics_i_model1, metrics_i_model2, model1_name, model2_name, exclude_other=True):
     print("\nTTest from %s to %s"%(model1_name, model2_name))
     if exclude_other is True:
         print("Below is the metric comparsion across the two models" + \
@@ -186,9 +191,12 @@ def indiv_metric_comparison(metrics_i_model1, metrics_i_model2, model1_name, mod
     for column in metrics_i_model1:
         metric_model1 = metrics_i_model1[column].tolist()
         metric_model2 = metrics_i_model2[column].tolist()
-        if exclude_other is True:
+        if exclude_other is True and dataset == 'semeval2010':
             metric_model1 = metric_model1[:-1] # excluding 'Other'
             metric_model2 = metric_model2[:-1]
+        if exclude_other is True and dataset == 'i2b2':
+            metric_model1 = metric_model1[1:]
+            metric_model2 = metric_model2[1:]
         tt = ttest_rel(metric_model1, metric_model2)
         print("Metric: %s \t statistic %.2f \t p_value %s"%
               (column, tt.statistic, tt.pvalue))
@@ -226,27 +234,29 @@ def get_accuracy_difference(accuracy_model1, accuracy_model2, model1_name, model
 # when exclude_other is 0, we print indiv relation metrics without the other class
 # when it is 1, we print it with the other class only
 # when it is 2, we print both with and without other class
-def print_full_summary(model1_loc, model2_loc, model1_name, model2_name, res,
-        relation_full_form_dictionary, relation_as_short_list, exclude_other=0, full_form=False):
+def print_full_summary(dataset, model1_loc, model2_loc, model1_name, model2_name, res,
+        relation_full_form_dictionary, relation_as_short_list, confusion_matrix_portion, exclude_other=0, full_form=False):
     model1 = res(model1_loc)
     model2 = res(model2_loc)
+    if dataset != 'semeval2010' and dataset != 'i2b2' and dataset != 'ddi':
+        raise Exception("At the moment, this summary script only supports semeval 2010, i2b2, and ddi")
     
     cm_model1, summary_cm_model1, correct_pred_model1, metrics_i_model1, \
     metrics_ma_mi_model1, accuracy_model1 \
-    = create_summary(model1, relation_full_form_dictionary, relation_as_short_list, full_form)
+    = create_summary(model1, relation_full_form_dictionary, relation_as_short_list, confusion_matrix_portion, full_form)
     
     cm_model2, summary_cm_model2, correct_pred_model2, metrics_i_model2, \
     metrics_ma_mi_model2, accuracy_model2 \
-    = create_summary(model2, relation_full_form_dictionary, relation_as_short_list, full_form)
+    = create_summary(model2, relation_full_form_dictionary, relation_as_short_list, confusion_matrix_portion, full_form)
     
     # T Test of each metrics, across the relations not Other
     if exclude_other == 1:
-        indiv_metric_comparison(metrics_i_model1, metrics_i_model2, model1_name, model2_name, 
+        indiv_metric_comparison(dataset, metrics_i_model1, metrics_i_model2, model1_name, model2_name, 
                 exclude_other=False)
     else:
-        indiv_metric_comparison(metrics_i_model1, metrics_i_model2, model1_name, model2_name)
+        indiv_metric_comparison(dataset, metrics_i_model1, metrics_i_model2, model1_name, model2_name)
         if exclude_other == 2:
-            indiv_metric_comparison(metrics_i_model1, metrics_i_model2, model1_name, model2_name,
+            indiv_metric_comparison(dataset, metrics_i_model1, metrics_i_model2, model1_name, model2_name,
                     exclude_other=False)
     
     # Get the difference in the macro and micro scores
