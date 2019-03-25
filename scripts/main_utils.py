@@ -64,7 +64,7 @@ def perform_assertions(config):
         raise NotImplementedError("You cannot use test data and perform early stopping. Stop overfitting.")
     if config.use_test is True and config.cross_validate is True:
         raise NotImplementedError("You cannot use test data and perform cross validation at the same time")
-    if config.use_elmo is True and config.preprocessing_type != 'original':
+    if config.use_elmo is True and config.preprocessing_type != 'original' and config.dataset != 'i2b2':
         raise NotImplementedError("You can only use the elmo embeddings with the original preprocessing")
 
 def get_maximum_entity_and_sentence_length(data, early_stop):
@@ -107,9 +107,7 @@ def log_info(log, data_size, config):
     log.info('total words: %d' % data_size['num_words'])
 
 # get the train and dev data , as well as early stop data in the correct form
-def get_data(res, dataset, cross_validate, train_text_dataset_path, test_text_dataset_path,
-        fold, use_test, early_stop, early_stop_size, border_size, mode='normal'):
-
+def get_data(res, dataset, config, mode='normal'):
     def transpose(data):
         # convert the list of tuples (outer dimension num of sentences) to tuple of lists (outer dim features)
         transposed_data = []
@@ -118,72 +116,57 @@ def get_data(res, dataset, cross_validate, train_text_dataset_path, test_text_da
         return tuple(transposed_data)
 
     # setting the train, dev data; pretend that test data does not exist
-    train_text_dataset_file = res(train_text_dataset_path)
-    test_text_dataset_file = res(test_text_dataset_path)
-    if cross_validate is False:
+    train_text_dataset_file = res(config.train_text_dataset_path)
+    test_text_dataset_file = res(config.test_text_dataset_path)
+    if config.cross_validate is False:
         train_data = main_utils.openFileAsList(train_text_dataset_file)
     else:
-        train_data = dataset.get_data_for_fold(fold, mode=mode)
-        dev_data = dataset.get_data_for_fold(fold, DEV, mode=mode)
+        train_data = dataset.get_data_for_fold(config.fold, mode=mode)
+        dev_data = dataset.get_data_for_fold(config.fold, DEV, mode=mode)
 
     # now each of the above data contains the following in order:
     # sentences, relations, e1_pos, e2_pos
 
     # if you are using the pickle file with unsplit sentences, you will do the following:
     # random select dev set when there is no cross validation
-    if cross_validate is False:
+    if config.cross_validate is False:
         # split data
-        train_data = preprocess_data_noncrossvalidated(train_data, border_size)
-        #dev_data = main_utils.preprocess_data_noncrossvalidated(dev_data, border_size)
+        train_data = preprocess_data_noncrossvalidated(train_data, config.border_size)
         
         if mode == 'elmo':
-            train_elmo = data_utils.get_elmo_embeddings(res('elmo/train_original_border_' + str(border_size) + '.hdf5'))
+            train_elmo = data_utils.get_elmo_embeddings(res('elmo/train_' + config.preprocessing_type +'_border_' + str(config.border_size) + '.hdf5'))
             train_data = train_data + train_elmo
 
-        if use_test is False:
+        if config.use_test is False:
             train_data = list(zip(*train_data)) # need to convert to dimensionality of sentences
             devsize = int(len(train_data)*0.15)
             select_index = random.sample(range(0, len(train_data)), devsize)
             dev_data = [train_data[idx] for idx in range(len(train_data)) if idx in select_index]
             tmp_train_data = [train_data[idx] for idx in range(len(train_data)) if idx not in select_index]
             train_data = tmp_train_data
-            if early_stop is True:
+            if config.early_stop is True:
                 early_stop_size = int(len(dev_data)*0.5)
-                select_index = random.sample(range(0, len(dev_data)), early_stop_size)
+                select_index = random.sample(range(0, len(dev_data)), config.early_stop_size)
                 early_stop_data = [dev_data[idx] for idx in range(len(dev_data)) if idx in select_index]
                 dev_data = list(set(dev_data) - set(early_stop_data))
                 early_stop_data = transpose(early_stop_data)
             train_data = transpose(train_data)
             dev_data = transpose(dev_data)
 
-        elif use_test is True:
+        elif config.use_test is True:
             dev_data = open(test_text_dataset_file, 'r') # means we will report test scores
-            dev_data = preprocess_data_noncrossvalidated(dev_data, border_size)
+            dev_data = preprocess_data_noncrossvalidated(dev_data, config.border_size)
             if mode == 'elmo':
-                test_elmo = data_utils.get_elmo_embeddings(res('elmo/test_original_border_' + str(border_size) + '.hdf5'))
+                test_elmo = data_utils.get_elmo_embeddings(res('elmo/test_' + config.preprocessing_type + '_border_' + str(config.border_size) + '.hdf5'))
                 dev_data = dev_data + test_elmo
 
-        
-        #if use_test is True and mode == 'elmo':
-        #    train_elmo = data_utils.get_elmo_embeddings(res('elmo/train-elmo-full.hdf5'))
-        #    test_elmo = data_utils.get_elmo_embeddings(res('elmo/test-elmo-full.hdf5'))
-        #    train_data = train_data + train_elmo
-        #    dev_data = dev_data + test_elmo # in this case this is actually the test data
-        #elif config.use_test is False and mode == 'elmo':
-        #    raise NotImplementedError('Cannot use elmo embeddings with a randomly sampled dev set')
-        
-        #train_data = data_utils.replace_by_drug_ddi(train_data)
-        #dev_data = data_utils.replace_by_drug_ddi(dev_data)
-        #if use_test is False and early_stop is True:
-        #    early_stop_data = main_utils.preprocess_data_noncrossvalidated(early_stop_data, border_size)
-            #early_stop_data = data_utils.replace_by_drug_ddi(early_stop_data)
-        elif use_test is True and early_stop is True:
+        elif config.use_test is True and config.early_stop is True:
             raise NotImplementedError('You cannot do early stopping when using test set.')
 
     # only need below if doing early stop
-    if early_stop is True and cross_validate is True:
-        early_stop_size = int(len(train_data[0])*early_stop_size)
-        select_index = random.sample(range(0, len(train_data[0])), early_stop_size)
+    if config.early_stop is True and config.cross_validate is True:
+        early_stop_size = int(len(train_data[0])*config.early_stop_size)
+        select_index = random.sample(range(0, len(train_data[0])), config.early_stop_size)
         new_train_data = []
         early_stop_data = []
         for items in train_data:
@@ -195,7 +178,7 @@ def get_data(res, dataset, cross_validate, train_text_dataset_path, test_text_da
         train_data = tuple(new_train_data)
         early_stop_data = tuple(early_stop_data)
 
-    if early_stop is True:
+    if config.early_stop is True:
         return train_data, dev_data, early_stop_data, train_text_dataset_file, test_text_dataset_file
     return train_data, dev_data, train_text_dataset_file, test_text_dataset_file
 

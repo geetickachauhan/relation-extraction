@@ -83,13 +83,13 @@ else:
     mode = 'normal'
 
 if config.cross_validate is True:
-    dataset = \
+    pickled_dataset = \
     data_utils.Dataset(res(prefix + 'pickled-files/seed_{K}_{folds}-fold-border_{N}{post}.pkl').format(K=config.pickle_seed,
         N=config.border_size, folds=folds, post=post))
     print("pickled files:", res(prefix + 'pickled-files/seed_{K}_{folds}-fold-border_{N}{post}.pkl').format(K=config.pickle_seed,
         N=config.border_size, folds=folds, post=post))
 else:
-    dataset = None
+    pickled_dataset = None
 
 date_of_experiment_start = None
 
@@ -117,18 +117,14 @@ def init():
     ###
     if config.early_stop is True:
         train_data, dev_data, early_stop_data, config.train_text_dataset_file, config.test_text_dataset_file =\
-                main_utils.get_data(res, dataset, config.cross_validate, config.train_text_dataset_path, config.test_text_dataset_path,
-                        config.fold, config.use_test, config.early_stop, config.early_stop_size,
-                        config.border_size, mode=mode)
+                main_utils.get_data(res, pickled_dataset, config, mode=mode)
         data_size = {'train': len(train_data[0]), 'dev': len(dev_data[0]), 'early_stop':
                 len(early_stop_data[0])}
         data = {'train': train_data, 'dev': dev_data, 'early_stop': early_stop_data}
 
     else:
         train_data, dev_data, config.train_text_dataset_file, config.test_text_dataset_file = \
-                main_utils.get_data(res, dataset, config.cross_validate, config.train_text_dataset_path, config.test_text_dataset_path,
-                        config.fold, config.use_test, config.early_stop, config.early_stop_size,
-                        config.border_size, mode=mode)
+                main_utils.get_data(res, pickled_dataset, config, mode=mode)
         data_size = {'train': len(train_data[0]), 'dev': len(dev_data[0])}
         data = {'train': train_data, 'dev': dev_data}
 

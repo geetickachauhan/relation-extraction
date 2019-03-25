@@ -63,7 +63,7 @@ def get_file_metrics(num_relations, result_file, confusion_matrix_portion):
             if official_portion_file is False:
                 continue
             confusion_matrix_line = read_confusion_matrix_per_line(cur_line)
-            if confusion_matrix_line is not None and len(confusion_matrix_official) < num_relations: 
+            if confusion_matrix_line is not None: 
                 confusion_matrix_official.append(confusion_matrix_line)
             
             acc = read_accuracy_per_line(cur_line)
@@ -72,9 +72,9 @@ def get_file_metrics(num_relations, result_file, confusion_matrix_portion):
             # figure out which sub portion of the official portion we are in 
             if cur_line.startswith('Results for the individual relations:'):
                 individual_relations_f1_portion = True
-            elif cur_line.startswith('Micro-averaged result (excluding Other):'):
+            elif cur_line.startswith('Micro-averaged result'):
                 micro_f1_portion = True
-            elif cur_line.startswith('MACRO-averaged result (excluding Other):'):
+            elif cur_line.startswith('MACRO-averaged result'):
                 macro_f1_portion = True
             
             # populate the precision, recall and f1 for the correct respective lists
@@ -156,13 +156,10 @@ def create_summary(result_file, relation_full_form_dictionary, relation_as_short
     metrics_indiv_relations, metrics_micro, metrics_macro = get_file_metrics(num_relations, result_file, confusion_matrix_portion)
     # get the confusion matrix dataframe
     confusion_matrix_df = get_confusion_matrix_as_df(confusion_matrix_official, relation_as_short_list)
-    
     # these are the summary information that will need to be returned
     pretty_summary_confusion_matrix_df = \
-            generate_pretty_summary_confusion_matrix(confusion_matrix_df, relation_full_form_dictionary,
-                    full_form)
+            generate_pretty_summary_confusion_matrix(confusion_matrix_df, relation_full_form_dictionary, full_form)
     total_correct_predictions = pretty_summary_confusion_matrix_df['Correct Predictions'].sum()
-    print(metrics_indiv_relations)
     metrics_indiv_relations_df = create_metrics_indiv_relations_df(metrics_indiv_relations, 
                                                                    relation_full_form_dictionary, 
                                                                    relation_as_short_list)
