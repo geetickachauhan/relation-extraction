@@ -317,7 +317,7 @@ if __name__ == '__main__':
     main_utils.perform_assertions(config)
 
     # create the necessary output folders
-    config.output_dir = '/scratch/geeticka/relation-extraction/output/' + config.dataset + '/'
+    config.output_dir = os.path.join(config.output_dir, config.dataset)
     main_utils.create_folder_if_not_exists(config.output_dir)
     config.id = str(uuid.uuid4())
     date = main_utils.get_current_date() # this is to get the date when the experiment was started,

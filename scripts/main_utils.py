@@ -132,7 +132,6 @@ def get_data(res, dataset, config, mode='normal'):
     if config.cross_validate is False:
         # split data
         train_data = preprocess_data_noncrossvalidated(train_data, config.border_size)
-        
         if mode == 'elmo':
             train_elmo = data_utils.get_elmo_embeddings(res('elmo/train_' + config.preprocessing_type +'_border_' + str(config.border_size) + '.hdf5'))
             train_data = train_data + train_elmo

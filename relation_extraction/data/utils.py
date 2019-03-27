@@ -300,6 +300,10 @@ def vectorize(config, data, word_dict):
             return pos1[1], pos2[1]
         elif pos1[1] > pos2[1]:
             return pos2[1], pos1[1]
+        elif config.use_piecewise_pool is True and config.dataset == 'i2b2':
+            if pos1[0] < pos2[0]: return pos1[0], pos2[0]
+            elif pos1[0] > pos2[0]: return pos2[0], pos2[1]
+            else: raise Exception("Both entities overlap exactly")
         elif config.use_piecewise_pool is True:
             raise Exception("Entity positions cannot end at the same position for piecewise splitting")
             # I anticipate the above to be a problem for NER blinding, where there are 
@@ -440,49 +444,51 @@ def get_elmo_embeddings(filename):
 # then cut the sentence according to the required border size
 # if border size is -1, means using the full sentence, if it is 0, means only using
 # the sentence between two entities (inclusive)
+# note that using the border size parameter is very specific to the datasets that have
+# no entity overlaps and e1 appearing before e2 in the sentence
+# this does not work for i2b2 and ddi dataset
 def split_data_cut_sentence(data, border_size=-1):
-        sentences = []
-        relations = []
-        e1_pos = []
-        e2_pos = []
-        # is_reversed = []
+    sentences = []
+    relations = []
+    e1_pos = []
+    e2_pos = []
+    # is_reversed = []
 
-        # In the parsed data: Num1 num2 num3 num4 num5 sentence
-        # Num1 - relation number
-        # Num2 - left entity start (starts the numbering from 0)
-        # Num3 - left entity end
-        # Num4 - right entity start
-        # Num5 - right entity end
-        if border_size < 0:
-                for line in data:
-                        line = line.strip().lower().split()
-                        left_start_pos = int(line[1])
-                        right_end_pos = int(line[4])
-                        if left_start_pos < right_end_pos:
-                                relations.append(int(line[0]))
-                                e1_pos.append( (int(line[1]), int(line[2])) ) # (start_pos, end_pos)
-                                e2_pos.append( (int(line[3]), int(line[4])) ) # (start_pos, end_pos)
-                                # is_reversed.append( float(isreversed_dictionary[int(line[0])]) )
-                                sentences.append(line[5:])
-        else:
-                for line in data:
-                        line = line.strip().lower().split()
-                        left_start_pos = int(line[1])
-                        right_end_pos = int(line[4])
-                        if left_start_pos < right_end_pos:
-                                relations.append(int(line[0]))
-                                # is_reversed.append( float(isreversed_dictionary[int(line[0])]) )
-                                sentence = line[5:]
-                                len_sen = len(sentence)
-                                if left_start_pos >= border_size:
-                                        left_border_size = border_size
-                                else:
-                                        left_border_size = left_start_pos
-                                e1_pos.append( (left_border_size, int(line[2])-left_start_pos+left_border_size) ) # (start_pos, end_pos)
-                                e2_pos.append((int(line[3])-left_start_pos+left_border_size, int(line[4])-left_start_pos+left_border_size)) # (start_pos, end_pos)
-                                sentences.append(sentence[(left_start_pos-left_border_size):min(right_end_pos+border_size+1, len_sen)])
+    # In the parsed data: Num1 num2 num3 num4 num5 sentence
+    # Num1 - relation number
+    # Num2 - left entity start (starts the numbering from 0)
+    # Num3 - left entity end
+    # Num4 - right entity start
+    # Num5 - right entity end
+    if border_size < 0:
+        for line in data:
+            line = line.strip().lower().split()
+            left_start_pos = int(line[1])
+            right_end_pos = int(line[4])
+            relations.append(int(line[0]))
+            e1_pos.append( (int(line[1]), int(line[2])) ) # (start_pos, end_pos)
+            e2_pos.append( (int(line[3]), int(line[4])) ) # (start_pos, end_pos)
+            # is_reversed.append( float(isreversed_dictionary[int(line[0])]) )
+            sentences.append(line[5:])
+    else:
+        for line in data:
+            line = line.strip().lower().split()
+            left_start_pos = int(line[1])
+            right_end_pos = int(line[4])
+            if left_start_pos < right_end_pos:
+                relations.append(int(line[0]))
+                # is_reversed.append( float(isreversed_dictionary[int(line[0])]) )
+                sentence = line[5:]
+                len_sen = len(sentence)
+                if left_start_pos >= border_size:
+                    left_border_size = border_size
+                else:
+                    left_border_size = left_start_pos
+                e1_pos.append( (left_border_size, int(line[2])-left_start_pos+left_border_size) ) # (start_pos, end_pos)
+                e2_pos.append((int(line[3])-left_start_pos+left_border_size, int(line[4])-left_start_pos+left_border_size)) # (start_pos, end_pos)
+                sentences.append(sentence[(left_start_pos-left_border_size):min(right_end_pos+border_size+1, len_sen)])
 
-        return sentences, relations, e1_pos, e2_pos
+    return sentences, relations, e1_pos, e2_pos
 
 def graph_file_reader(f_file, dim):
     """
