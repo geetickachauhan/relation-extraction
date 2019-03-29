@@ -38,7 +38,7 @@ def dump_csv(config, parameters, num_folds, date, evaluation_metric_print, postf
         if num_folds == 1: # means we are not doing cross val
             columns.remove('Fold Number')
         result_dataframe = pd.DataFrame(
-            columns, # will need to handle date of starting command differently for hyperparam tuning
+            columns=columns, # will need to handle date of starting command differently for hyperparam tuning
         )
     start_index = len(result_dataframe.index)
     curr_fold = 0
@@ -64,7 +64,8 @@ def perform_assertions(config):
         raise NotImplementedError("You cannot use test data and perform early stopping. Stop overfitting.")
     if config.use_test is True and config.cross_validate is True:
         raise NotImplementedError("You cannot use test data and perform cross validation at the same time")
-    if config.use_elmo is True and config.preprocessing_type != 'original' and config.dataset != 'i2b2':
+    if config.use_elmo is True and config.preprocessing_type != 'original' and config.dataset != 'i2b2' and \
+            config.dataset != 'ddi':
         raise NotImplementedError("You can only use the elmo embeddings with the original preprocessing")
 
 def get_maximum_entity_and_sentence_length(data, early_stop):
