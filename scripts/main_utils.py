@@ -24,6 +24,9 @@ def set_hyperparams(config):
     config.batch_size = int(hyperparams['batch_size'])
     config.early_stop = hyperparams['early_stop']
     learning_rate_init = round(hyperparams['learning_rate_init'], 5)
+    if config.early_stop is True:
+        config.patience = int(config.num_epoches/5)
+    
     if hyperparams['learning_rate'] == 'constant':
         config.lr_values = [learning_rate_init, learning_rate_init]
         config.lr_boundaries = [int(config.num_epoches/2)]
