@@ -12,9 +12,24 @@ import parser
 import main_utils
 import random 
 import relation_extraction.data.utils as data_utils
+from relation_extraction.hyperparam_tuning.distributions import CNN_dist
 import pandas as pd
 
 TRAIN, DEV, TEST = 0, 1, 2
+
+def set_hyperparams(config):
+    hyperparams = CNN_dist._sample()
+    config.num_epoches = hyperparams['num_epoches']
+    config.filter_sizes = hyperparams['filter_size']
+    config.batch_size = int(hyperparams['batch_size'])
+    config.early_stop = hyperparams['early_stop']
+    learning_rate_init = round(hyperparams['learning_rate_init'], 5)
+    if hyperparams['learning_rate'] == 'constant':
+        config.lr_values = [learning_rate_init, learning_rate_init]
+        config.lr_boundaries = [int(config.num_epoches/2)]
+    else: # this is going to be complicated
+        config.lr_values = [0.001, learning_rate_init]
+        config.lr_boundaries = [int(config.num_epoches/2)]
 
 # Dump the CSV file, postfix is to specify whether this is cross val, on test data or just a dev set
 def dump_csv(config, parameters, num_folds, date, evaluation_metric_print, postfix=''):
@@ -59,6 +74,9 @@ def dump_csv(config, parameters, num_folds, date, evaluation_metric_print, postf
     result_dataframe.to_csv(final_result_path, index=False)
 
 def perform_assertions(config):
+    if config.hyperparam_tuning_mode is True and config.random_search is True:
+        if config.cross_validate is True: raise Exception("Random Search is only supported with non cross val")
+        if config.use_test is True: raise Exception("You cannot use test set when performing hyperparam tuning")
     assert len(config.lr_boundaries) == len(config.lr_values) - 1
     if config.use_test is True and config.early_stop is True:
         raise NotImplementedError("You cannot use test data and perform early stopping. Stop overfitting.")
@@ -140,15 +158,21 @@ def get_data(res, dataset, config, mode='normal'):
         if config.use_test is False:
             train_data = list(zip(*train_data)) # need to convert to dimensionality of sentences
             devsize = int(len(train_data)*0.15)
+            if config.hyperparam_tuning_mode is True:
+                random.seed(config.seed) # set the seed in order to ensure that same dev set sampled when 
+            # hyperparam tuning mode is on
             select_index = random.sample(range(0, len(train_data)), devsize)
             dev_data = [train_data[idx] for idx in range(len(train_data)) if idx in select_index]
             tmp_train_data = [train_data[idx] for idx in range(len(train_data)) if idx not in select_index]
             train_data = tmp_train_data
             if config.early_stop is True:
-                early_stop_size = int(len(dev_data)*0.5)
-                select_index = random.sample(range(0, len(dev_data)), config.early_stop_size)
+                early_stop_size = int(len(dev_data)*config.early_stop_size)
+                if config.hyperparam_tuning_mode is True:
+                    random.seed(config.seed)
+                select_index = random.sample(range(0, len(dev_data)), early_stop_size)
                 early_stop_data = [dev_data[idx] for idx in range(len(dev_data)) if idx in select_index]
-                dev_data = list(set(dev_data) - set(early_stop_data))
+                tmp_dev_data = [dev_data[idx] for idx in range(len(dev_data)) if idx not in select_index]
+                dev_data = tmp_dev_data
                 early_stop_data = transpose(early_stop_data)
             train_data = transpose(train_data)
             dev_data = transpose(dev_data)

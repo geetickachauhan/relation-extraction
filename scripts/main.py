@@ -315,7 +315,8 @@ def main(date_of_experiment_start):
 if __name__ == '__main__':
 
     main_utils.perform_assertions(config)
-
+    if config.hyperparam_tuning_mode is True and config.random_search is True:
+        main_utils.set_hyperparams(config)
     # create the necessary output folders
     config.output_dir = os.path.join(config.output_dir, config.dataset)
     main_utils.create_folder_if_not_exists(config.output_dir)

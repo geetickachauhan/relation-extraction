@@ -102,7 +102,7 @@ parser.add_argument('--final_result_folder', default=None, help="Final result CS
 parser.add_argument('--log_file', default=None,
                                                 help='log file')
 
-parser.add_argument('--early_stop_size', default=0.1, type=float,
+parser.add_argument('--early_stop_size', default=0.5, type=float,
                                                 help='early stop size as a percentage of train set')
 parser.add_argument('--cross_validate', default=False, action='store_true',
                                                 help='whether to implement cross validation')
@@ -114,6 +114,8 @@ parser.add_argument('--use_piecewise_pool', default=False, action='store_true',
                                                 help='whether to do piecewise max pooling')
 parser.add_argument('--hyperparam_tuning_mode', default=False, action='store_true',
                                                 help='whether hyperparameter tuning mode was on')
+parser.add_argument('--random_search', default=False, action='store_true',
+                                                help='whether random search should be implemented')
 parser.add_argument('--preprocessing_type', default='original', 
 help= 'specify the preprocessing type from original, entity_blinding, punct_digit, punct_stop_digit')
 
