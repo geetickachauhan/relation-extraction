@@ -19,7 +19,7 @@ TRAIN, DEV, TEST = 0, 1, 2
 
 def set_hyperparams(config):
     hyperparams = CNN_dist._sample()
-    config.num_epoches = hyperparams['num_epoches']
+    config.num_epoches = int(hyperparams['num_epoches'])
     config.filter_sizes = hyperparams['filter_size']
     config.batch_size = int(hyperparams['batch_size'])
     config.early_stop = hyperparams['early_stop']
@@ -28,10 +28,10 @@ def set_hyperparams(config):
         config.patience = int(config.num_epoches/5)
     
     if hyperparams['learning_rate'] == 'constant':
-        config.lr_values = [learning_rate_init, learning_rate_init]
+        config.lr_values = [float(learning_rate_init), float(learning_rate_init)]
         config.lr_boundaries = [int(config.num_epoches/2)]
     else: # this is going to be complicated
-        config.lr_values = [0.001, learning_rate_init]
+        config.lr_values = [float(0.001), float(learning_rate_init)]
         config.lr_boundaries = [int(config.num_epoches/2)]
 
 # Dump the CSV file, postfix is to specify whether this is cross val, on test data or just a dev set
