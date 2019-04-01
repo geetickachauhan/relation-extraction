@@ -16,9 +16,12 @@ def read_confusion_matrix_per_line(cur_line):
         pipe_seen = 0 # the correct numbers are between two pipes
         confusion_matrix_line = []
         for val in splitted_line:
-            if val == '|':
+            if val.startswith('|'):
                 pipe_seen += 1
-            if pipe_seen == 1 and val != '|': # keep collecting the values as you are
+            if pipe_seen == 1 and val.strip() != '|': # keep collecting the values as you are
+                val = [x for x in val if x != '|'] # to handle some special cases when the pipe operator 
+                # is stuck to the number (happens when the number is too long)
+                val = ''.join(val)
                 confusion_matrix_line.append(float(val))
         return confusion_matrix_line
     return None
@@ -97,14 +100,14 @@ def get_confusion_matrix_as_df(confusion_matrix_official, relations_as_short_lis
     return confusion_matrix_df
 
 # Give the confusions acorss each relation, with a special interest on other
-def generate_confused_with_string(index, row, relation_full_form_dictionary, full_form=False):
+def generate_confused_with_string(idx, row, relation_full_form_dictionary, full_form=False):
     # index is the current relation that we are considering and row is all the predicted examples
     confused_with_string = ""
     num_of_columns = len(row.index)
     for i in range(0, num_of_columns):
         column_name = row.index[i]
         column_value = int(row.loc[column_name])
-        if column_value > 0 and column_name != index:
+        if column_value > 0 and column_name != idx:
             if full_form is True: column_name = relation_full_form_dictionary[column_name]
             confused_with_string += " " + column_name + "(" + str(column_value) + ")"
     return confused_with_string.strip()
