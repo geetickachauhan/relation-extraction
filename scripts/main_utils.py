@@ -188,7 +188,7 @@ def get_data(res, dataset, config, mode='normal'):
                 train_data = list(zip(*train_data))
                 early_stop_size = int(len(train_data)* config.early_stop_size)
                 select_index = random.sample(range(0, len(train_data)), early_stop_size)
-                early_stop_data [train_data[idx] for idx in range(len(train_data)) if idx in select_index]
+                early_stop_data = [train_data[idx] for idx in range(len(train_data)) if idx in select_index]
                 tmp_train_data = [train_data[idx] for idx in range(len(train_data)) if idx not in select_index]
                 train_data = tmp_train_data
                 early_stop_data = transpose(early_stop_data)
