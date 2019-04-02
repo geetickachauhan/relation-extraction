@@ -182,6 +182,6 @@ def get_results_dict(config, train_start_time_in_miliseconds):
     results['execution_details']['time_stamp'] = train_start_time_in_miliseconds
     results['execution_details']['early_stop'] = False
     results['execution_details']['keyboard_interrupt'] = False
-    results['execution_details']['num_epochs'] = 0
+    results['execution_details']['num_epochs'] = 0 # TODO (geeticka): legacy parameter - delete this 
 
     return results, parameters
