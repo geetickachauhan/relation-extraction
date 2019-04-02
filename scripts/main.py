@@ -239,7 +239,7 @@ def main(date_of_experiment_start):
                     if config.early_stop is True:
                         early_stop_acc, early_stop_preds = model_utils.run_epoch(
                                 session, m_eval, early_stop_iter, epoch, config.batch_size,
-                                config.dataset, config.classnum, verbose=False, is_training=False
+                                config.dataset, config.classnum, verbose=False, is_training=False, mode=mode
                         )
                         early_stop_result_filepath = os.path.join(config.output_folder,
                                 "result-earlystop.txt")

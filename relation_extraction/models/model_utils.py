@@ -31,6 +31,7 @@ def run_epoch(session, model, batch_iter, epoch, batch_size, dataset, classnum, 
     preds = []
     scores = []
 
+    print('Mode: ', mode)
 
     for batch in batch_iter:
         step += 1
@@ -38,9 +39,10 @@ def run_epoch(session, model, batch_iter, epoch, batch_size, dataset, classnum, 
         batch = (x for x in zip(*batch))
         # because the batch contains the sentences, e1, e2 etc all as separate lists, zip(*) makes it
         # such that every line of the new tuple contains the first element of sentences, e1, e2 etc
-        if mode == 'elmo': sents, relations, e1, e2, dist1, dist2, elmo_embeddings, position1, \
-                position2 = batch
-        else: sents, relations, e1, e2, dist1, dist2, position1, position2 = batch
+        if mode == 'elmo': 
+            sents, relations, e1, e2, dist1, dist2, elmo_embeddings, position1, position2 = batch
+        else: 
+            sents, relations, e1, e2, dist1, dist2, position1, position2 = batch
         
         sents = np.vstack(sents)
         
