@@ -81,8 +81,6 @@ def perform_assertions(config):
         if config.cross_validate is True: raise Exception("Random Search is only supported with non cross val")
         if config.use_test is True: raise Exception("You cannot use test set when performing hyperparam tuning")
     assert len(config.lr_boundaries) == len(config.lr_values) - 1
-    if config.use_test is True and config.early_stop is True:
-        raise NotImplementedError("You cannot use test data and perform early stopping. Stop overfitting.")
     if config.use_test is True and config.cross_validate is True:
         raise NotImplementedError("You cannot use test data and perform cross validation at the same time")
     if config.use_elmo is True and config.preprocessing_type != 'original' and config.dataset != 'i2b2' and \
@@ -168,7 +166,7 @@ def get_data(res, dataset, config, mode='normal'):
             dev_data = [train_data[idx] for idx in range(len(train_data)) if idx in select_index]
             tmp_train_data = [train_data[idx] for idx in range(len(train_data)) if idx not in select_index]
             train_data = tmp_train_data
-            if config.early_stop is True:
+            if config.early_stop is True: # this is assuming that we are not using test data
                 early_stop_size = int(len(dev_data)*config.early_stop_size)
                 if config.hyperparam_tuning_mode is True:
                     random.seed(config.seed)
@@ -186,9 +184,15 @@ def get_data(res, dataset, config, mode='normal'):
             if mode == 'elmo':
                 test_elmo = data_utils.get_elmo_embeddings(res('elmo/test_' + config.preprocessing_type + '_border_' + str(config.border_size) + '.hdf5'))
                 dev_data = dev_data + test_elmo
-
-        elif config.use_test is True and config.early_stop is True:
-            raise NotImplementedError('You cannot do early stopping when using test set.')
+            if config.early_stop is True: # be careful to choose early stop set only from the training data
+                train_data = list(zip(*train_data))
+                early_stop_size = int(len(train_data)* config.early_stop_size)
+                select_index = random.sample(range(0, len(train_data)), early_stop_size)
+                early_stop_data [train_data[idx] for idx in range(len(train_data)) if idx in select_index]
+                tmp_train_data = [train_data[idx] for idx in range(len(train_data)) if idx not in select_index]
+                train_data = tmp_train_data
+                early_stop_data = transpose(early_stop_data)
+                train_data = transpose(train_data)
 
     # only need below if doing early stop
     if config.early_stop is True and config.cross_validate is True:
