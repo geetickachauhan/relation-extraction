@@ -197,7 +197,7 @@ def get_data(res, dataset, config, mode='normal'):
     # only need below if doing early stop
     if config.early_stop is True and config.cross_validate is True:
         early_stop_size = int(len(train_data[0])*config.early_stop_size)
-        select_index = random.sample(range(0, len(train_data[0])), config.early_stop_size)
+        select_index = random.sample(range(0, len(train_data[0])), early_stop_size)
         new_train_data = []
         early_stop_data = []
         for items in train_data:
