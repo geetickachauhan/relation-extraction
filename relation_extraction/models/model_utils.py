@@ -31,7 +31,6 @@ def run_epoch(session, model, batch_iter, epoch, batch_size, dataset, classnum, 
     preds = []
     scores = []
 
-    print('Mode: ', mode)
 
     for batch in batch_iter:
         step += 1
