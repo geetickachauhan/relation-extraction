@@ -81,6 +81,8 @@ def perform_assertions(config):
         if config.cross_validate is True: raise Exception("Random Search is only supported with non cross val")
         if config.use_test is True: raise Exception("You cannot use test set when performing hyperparam tuning")
     assert len(config.lr_boundaries) == len(config.lr_values) - 1
+    if config.dataset != 'semeval2010' and config.border_size != -1:
+        raise Exception("Current implementation only supports border size -1 for non semeval datasets")
     if config.use_test is True and config.cross_validate is True:
         raise NotImplementedError("You cannot use test data and perform cross validation at the same time")
     if config.use_elmo is True and config.preprocessing_type != 'original' and config.dataset != 'i2b2' and \
