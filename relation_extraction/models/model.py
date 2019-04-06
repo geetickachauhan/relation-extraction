@@ -4,6 +4,7 @@ sys.path.append('../../')
 from relation_extraction.models import losses
 from relation_extraction.models.elmo_wrapper import elmo_wrapper
 from relation_extraction.models.pooling_wrapper import pooling_wrapper
+from relation_extraction.models.bert_wrapper import bert_wrapper
 
 #updating the Model class to be CRCNN
 class CRCNN(object):
@@ -32,8 +33,11 @@ class CRCNN(object):
         self.sgd_momentum = config.sgd_momentum
         self.tensorboard_folder = config.tensorboard_folder
         self.elmo = elmo_wrapper()
+        bert_es = 1024 if config.dataset == 'semeval2010' else 768
+        self.bert = bert_wrapper(bert_es)
         self.pooling = pooling_wrapper()
         self.use_elmo = config.use_elmo
+        self.use_bert = config.use_bert
         self.use_piecewise_pool = config.use_piecewise_pool
 
     def __run__(self):
@@ -59,6 +63,13 @@ class CRCNN(object):
             raise Exception("You should have called a pooling function! Number of pieces cannot be None.")
         output_d = self.dc * num_pieces * len(filter_sizes)
 
+        if self.use_bert is True:
+            bert_weighted_sum = self.bert.get_bert_weighted_sum()
+            output_d += self.bert.get_bert_embed_size()
+            h_pool_flat = tf.concat([h_pool_flat, bert_weighted_sum], axis=1)
+            if self.is_training and self.keep_prob < 1:
+                h_pool_flat = tf.nn.dropout(h_pool_flat, self.keep_prob)
+        
         # output
         W_o = tf.get_variable(initializer=initializer,shape=[output_d, self.nr]\
                 ,name='w_o', regularizer=regularizer)
@@ -118,6 +129,12 @@ class CRCNN(object):
             in_elmo = tf.placeholder(dtype=tf.float32, shape=[None, elmo_layers, self.n, elmo_es],     name='in_elmo')
             self.elmo.assign_in_elmo(in_elmo)
             self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_elmo, in_pos1, in_pos2)
+        elif self.use_bert is True:
+            bert_layers = self.bert.get_bert_layers()
+            bert_es = self.bert.get_bert_embed_size()
+            in_bert = tf.placeholder(dtype=tf.float32, shape=[None, bert_layers, bert_es],  name='in_bert')
+            self.bert.assign_in_bert(in_bert)
+            self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_bert, in_pos1, in_pos2)
         else:
             self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_pos1, in_pos2)
 

@@ -9,6 +9,7 @@ tags
 eval/result.txt
 eval/test.txt
 eval/test_key.txt
+bert/
 
 # C extensions
 *.so

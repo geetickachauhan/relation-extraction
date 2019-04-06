@@ -81,6 +81,8 @@ def perform_assertions(config):
         if config.cross_validate is True: raise Exception("Random Search is only supported with non cross val")
         if config.use_test is True: raise Exception("You cannot use test set when performing hyperparam tuning")
     assert len(config.lr_boundaries) == len(config.lr_values) - 1
+    if config.use_elmo is True and config.use_bert is True:
+        raise Exception("Current version of the code does not support using elmo and bert embeddings at the same time")
     if config.dataset != 'semeval2010' and config.border_size != -1:
         raise Exception("Current implementation only supports border size -1 for non semeval datasets")
     if config.use_test is True and config.cross_validate is True:
@@ -126,6 +128,7 @@ def log_info(log, data_size, config):
     print("seed for random initialization is ",  config.seed)
     print('use_test is', config.use_test)
     print('use_elmo is', config.use_elmo)
+    print("use_bert is ", config.use_bert)
     log.info('total words: %d' % data_size['num_words'])
 
 # get the train and dev data , as well as early stop data in the correct form
@@ -157,6 +160,10 @@ def get_data(res, dataset, config, mode='normal'):
         if mode == 'elmo':
             train_elmo = data_utils.get_elmo_embeddings(res('elmo/train_' + config.preprocessing_type +'_border_' + str(config.border_size) + '.hdf5'))
             train_data = train_data + train_elmo
+        elif mode == 'bert':
+            train_bert = data_utils.get_bert_CLS_embeddings(res('bert/train_' + config.preprocessing_type + \
+                    '_border_' + str(config.border_size) + '.json'))
+            train_data = train_data + train_bert
 
         if config.use_test is False:
             train_data = list(zip(*train_data)) # need to convert to dimensionality of sentences
@@ -186,6 +193,11 @@ def get_data(res, dataset, config, mode='normal'):
             if mode == 'elmo':
                 test_elmo = data_utils.get_elmo_embeddings(res('elmo/test_' + config.preprocessing_type + '_border_' + str(config.border_size) + '.hdf5'))
                 dev_data = dev_data + test_elmo
+            if mode == 'bert': # CLS is a fixed size sentence representation - no need to pad it 
+                test_bert = data_utils.get_bert_CLS_embeddings(res('bert/test_' + config.preprocessing_type + \
+                        '_border_' + str(config.border_size) + '.json'))
+                dev_data = dev_data + test_bert
+
             if config.early_stop is True: # be careful to choose early stop set only from the training data
                 train_data = list(zip(*train_data))
                 early_stop_size = int(len(train_data)* config.early_stop_size)

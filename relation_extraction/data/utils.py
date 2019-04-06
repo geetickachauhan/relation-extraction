@@ -12,6 +12,7 @@ from nltk import wordnet as wn
 import random
 import h5py # conda install -c conda-forge h5py
 from spacy.lang.en.stop_words import STOP_WORDS as stop_words
+import json
 
 #TODO (geeticka) need to clean up utils based upon the methods that are
 # not directly used by the script anymore
@@ -313,7 +314,9 @@ def vectorize(config, data, word_dict):
             return pos1[1], pos2[1] # this is not going to be used anyway, but using these is problematic
 
     if config.use_elmo is True: sentences, relations, e1_pos, e2_pos, elmo_embeddings = data
+    elif config.use_bert is True: sentences, relations, e1_pos, e2_pos, bert_embeddings = data
     else: sentences, relations, e1_pos, e2_pos = data
+    
     max_sen_len = config.max_len
     max_e1_len = config.max_e1_len
     max_e2_len = config.max_e2_len
@@ -362,6 +365,9 @@ def vectorize(config, data, word_dict):
     if config.use_elmo is True: 
         return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2, \
     padded_elmo_embeddings, position1, position2
+    if config.use_bert is True:
+        return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2, \
+                bert_embeddings, position1, position2
     return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2, position1, position2
     # we are also returning the ending positions of the entity 1 and entity 2
 
@@ -431,6 +437,8 @@ def convert_labels(read_file, save_file):
                                 outfile.write(' '.join(line))
 
 # read the elmo embeddings for the train and the test file
+# the dimensionality of the elmo embeddings is [batch, layers, tokens, dimensionality]
+# dimensionality is always 1024 in the case of elmo and each token has a representation here 
 def get_elmo_embeddings(filename):
     h5py_file = h5py.File(filename, 'r')
     elmo_embeddings = []
@@ -439,6 +447,30 @@ def get_elmo_embeddings(filename):
         embedding = h5py_file.get(str(i))
         elmo_embeddings.append(np.array(embedding))
     return (elmo_embeddings, )
+
+# this gets the sentence level embedding i.e. the CLS token, so convolution cannot
+# be performed with this; Shape returned: [batch, layers, dimensionality]
+# in most cases the dimensionality is 768 but in some cases could be 1024 for the BERT-large model
+# because the dumping of the embeddings was done using pytorch, refer to their method of writing to 
+# figure out how to do the reading
+# https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples/extract_features.py
+# refer to the above to figure out how to read this file
+def get_bert_CLS_embeddings(filename):
+    with open(filename, 'r', encoding='utf-8') as json_file:
+        bert_embeddings = []
+        for line in json_file.readlines():
+            data = json.loads(line)
+            if data['features'][0]['token'] != '[CLS]': 
+                raise Exception("The first token has to be CLS!")
+            layers_embedding = []
+            for layers in data['features'][0]['layers']:
+                layers_embedding.append(layers['values'])
+            bert_embeddings.append(layers_embedding)
+    return (bert_embeddings,)
+
+# TODO: (geeticka) a variant of the above is the extraction of the individual tokens and 
+# combining the ones with word piece; it would be likely important to normalize those and do 
+# a simple average across the embeddings 
 
 # this function first split the line of data into relation, entities and sentence
 # then cut the sentence according to the required border size

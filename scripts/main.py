@@ -78,6 +78,9 @@ def res(path): return os.path.join(config.data_root, path)
 if config.use_elmo is True: 
     prefix = 'elmo/'
     mode = 'elmo'
+elif config.use_bert is True:
+    prefix = 'bert/'
+    mode = 'bert'
 else: 
     prefix = ''
     mode = 'normal'
