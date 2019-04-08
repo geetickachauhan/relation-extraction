@@ -1,6 +1,7 @@
 import numpy as np
 import logging
 from collections import Counter
+import collections
 import pickle
 import re
 import networkx as nx
@@ -326,7 +327,7 @@ def vectorize(config, data, word_dict):
     print('max sen len: {}, local max e1 len: {}, local max e2 len: {}'.format(max_sen_len, local_max_e1_len, local_max_e2_len))
 
     if config.use_elmo is True: padded_elmo_embeddings = pad_elmo_embedding(max_sen_len, elmo_embeddings)
-    
+    if config.use_bert is True: padded_bert_embeddings = pad_elmo_embedding(max_sen_len, bert_embeddings)
     # maximum values needed to decide the dimensionality of the vector
     sents_vec = np.zeros((num_data, max_sen_len), dtype=int)
     e1_vec = np.zeros((num_data, max_e1_len), dtype=int)
@@ -367,7 +368,7 @@ def vectorize(config, data, word_dict):
     padded_elmo_embeddings, position1, position2
     if config.use_bert is True:
         return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2, \
-                bert_embeddings, position1, position2
+                padded_bert_embeddings, position1, position2
     return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2, position1, position2
     # we are also returning the ending positions of the entity 1 and entity 2
 
@@ -455,6 +456,9 @@ def get_elmo_embeddings(filename):
 # figure out how to do the reading
 # https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples/extract_features.py
 # refer to the above to figure out how to read this file
+# original file written by BERT has each line that 
+# looks like {'linex_index': 0, 'features': [{'token': ABC, 
+# 'layers': [{'index': -1, 'values': [...]}, ...., {'index: -4, 'values': [...]}]}]}
 def get_bert_CLS_embeddings(filename):
     with open(filename, 'r', encoding='utf-8') as json_file:
         bert_embeddings = []
@@ -468,9 +472,116 @@ def get_bert_CLS_embeddings(filename):
             bert_embeddings.append(layers_embedding)
     return (bert_embeddings,)
 
-# TODO: (geeticka) a variant of the above is the extraction of the individual tokens and 
-# combining the ones with word piece; it would be likely important to normalize those and do 
-# a simple average across the embeddings 
+# after having converted a bert embeddings json into the (layers, tokens, dimensionality) 
+# and merged the word piece embeddings portion, read those
+def get_bert_token_embeddings(filename):
+    with open(filename, 'r', encoding='utf-8') as json_file:
+        bert_embeddings = []
+        for line in json_file.readlines():
+            data = json.loads(line)
+            embedding_layer = []
+            for layer in data['layers']:
+                token = []
+                for tokens in layer['values']:
+                    token.append(np.array(tokens['features']))
+                embedding_layer.append(np.array(token))
+            bert_embeddings.append(np.array(embedding_layer))
+        return (bert_embeddings,)
+
+### A series of helper functions to generate the individual token BERT embeddings 
+### in the format needed by the CNN
+def average_over_token_embedding(indexes, features):
+    new_feature = collections.OrderedDict()
+    new_token = ''
+    new_layers = []
+    
+    layer_minus_1 = []; layer_minus_2 = []; layer_minus_3 = []; layer_minus_4 = [];
+    for index in indexes:
+        layer_minus_1.append(features[index]['layers'][0]['values'])
+        layer_minus_2.append(features[index]['layers'][1]['values'])
+        layer_minus_3.append(features[index]['layers'][2]['values'])
+        layer_minus_4.append(features[index]['layers'][3]['values'])
+        new_token += features[index]['token']
+    
+    def round_np_array(list_needed):
+        # according to the bert pytorch code, they are rounding by 6
+        new_list_needed = [round(x,6) for x in list_needed]
+        return new_list_needed
+
+    layer_minus_1_mean = list(np.mean(layer_minus_1, axis=0, dtype=np.float64))
+    layer_minus_2_mean = list(np.mean(layer_minus_2, axis=0, dtype=np.float64))
+    layer_minus_3_mean = list(np.mean(layer_minus_3, axis=0, dtype=np.float64))
+    layer_minus_4_mean = list(np.mean(layer_minus_4, axis=0, dtype=np.float64))
+
+    new_layers.append({'index': -1, 'values': round_np_array(layer_minus_1_mean)})
+    new_layers.append({'index': -2, 'values': round_np_array(layer_minus_2_mean)})
+    new_layers.append({'index': -3, 'values': round_np_array(layer_minus_3_mean)})
+    new_layers.append({'index': -4, 'values': round_np_array(layer_minus_4_mean)})
+    
+    new_feature['token'] = new_token
+    new_feature['layers'] = new_layers
+    return new_feature
+
+# generates individual sentence's feature maps after fusing the word pieces together
+def generate_feature_map_without_word_piece(features):
+    # need to double check and see why this is happening
+    new_features = []
+    i = 0
+    while(i < len(features)):
+        if features[i]['token'] == '[CLS]' or features[i]['token'] == '[SEP]':
+            i += 1
+            continue
+        captured_indexes = []
+        for j in range(i + 1, len(features)):
+            if not features[j]['token'].startswith('##'):
+                break
+            captured_indexes.append(j)
+        if len(captured_indexes) == 0: 
+            new_features.append(features[i])
+            i += 1
+            continue
+        sum_indexes = [i]
+        sum_indexes.extend(captured_indexes)
+        new_feature = average_over_token_embedding(sum_indexes, features)
+        new_features.append(new_feature)
+        i = captured_indexes[-1] + 1
+        
+    # rewrite in the elmo format as well
+    new_features_map = [] # we are converting from the (token, layers) shape to (layers, token) shape
+    layer_minus1 = []; layer_minus2 = []; layer_minus3 = []; layer_minus4 = [];
+    for token in new_features:
+        layer_minus1.append({'token': token['token'], 'features': token['layers'][0]['values']})
+        layer_minus2.append({'token': token['token'], 'features': token['layers'][1]['values']})
+        layer_minus3.append({'token': token['token'], 'features': token['layers'][2]['values']})
+        layer_minus4.append({'token': token['token'], 'features': token['layers'][3]['values']})
+    new_features_map.append({'index': -1, 'values': layer_minus1})
+    new_features_map.append({'index': -2, 'values': layer_minus2})
+    new_features_map.append({'index': -3, 'values': layer_minus3})
+    new_features_map.append({'index': -4, 'values': layer_minus4})
+    return new_features_map
+
+
+# because the dumping of the embeddings was done using pytorch, refer to their method of writing to 
+# figure out how to do the reading
+# https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples/extract_features.py
+# refer to the above to figure out how to read this file
+# need to import collections
+def write_bert_tokens_without_word_pieces(input_filename, output_filename):
+    with open(input_filename, 'r', encoding='utf-8') as input_file:
+        with open(output_filename, 'w', encoding='utf-8') as output_file:
+                for line in input_file.readlines():
+                    output_json = collections.OrderedDict()
+                    data = json.loads(line)
+                    if data['features'][0]['token'] != '[CLS]': raise Exception("The first token has to be CLS!")
+                    if data['features'][-1]['token'] != '[SEP]': raise Exception("The last token has to be SEP!")
+                    output_json['linex_index'] = data['linex_index']
+                    features = data['features'] # basically for all features['token'] that starts with ##, add up the values
+                     # for the respective indexes to put the words back together, ignore [CLS] and [SEP] tokens
+                    new_feature_map = generate_feature_map_without_word_piece(features) # this new feature map needs to be 
+                    # called layers because things have now been shuffled. 
+                    output_json['layers'] = new_feature_map
+                    output_file.write(json.dumps(output_json) + "\n")
+
 
 # this function first split the line of data into relation, entities and sentence
 # then cut the sentence according to the required border size

@@ -161,7 +161,7 @@ def get_data(res, dataset, config, mode='normal'):
             train_elmo = data_utils.get_elmo_embeddings(res('elmo/train_' + config.preprocessing_type +'_border_' + str(config.border_size) + '.hdf5'))
             train_data = train_data + train_elmo
         elif mode == 'bert':
-            train_bert = data_utils.get_bert_CLS_embeddings(res('bert/train_' + config.preprocessing_type + \
+            train_bert = data_utils.get_bert_token_embeddings(res('bert-tokens/train_' + config.preprocessing_type + \
                     '_border_' + str(config.border_size) + '.json'))
             train_data = train_data + train_bert
 
@@ -193,8 +193,8 @@ def get_data(res, dataset, config, mode='normal'):
             if mode == 'elmo':
                 test_elmo = data_utils.get_elmo_embeddings(res('elmo/test_' + config.preprocessing_type + '_border_' + str(config.border_size) + '.hdf5'))
                 dev_data = dev_data + test_elmo
-            if mode == 'bert': # CLS is a fixed size sentence representation - no need to pad it 
-                test_bert = data_utils.get_bert_CLS_embeddings(res('bert/test_' + config.preprocessing_type + \
+            if mode == 'bert': # CLS is a fixed size sentence representation - no need to pad that 
+                test_bert = data_utils.get_bert_token_embeddings(res('bert-tokens/test_' + config.preprocessing_type + \
                         '_border_' + str(config.border_size) + '.json'))
                 dev_data = dev_data + test_bert
 

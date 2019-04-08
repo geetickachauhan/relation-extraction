@@ -51,6 +51,10 @@ class CRCNN(object):
             elmo_weighted_sum = self.elmo.get_elmo_weighted_sum()
             d = self.dw + self.elmo.get_elmo_embed_size() + 2*self.dp
             list_to_concatenate = [x, elmo_weighted_sum, dist1, dist2]
+        elif self.use_bert is True:
+            bert_weighted_sum = self.bert.get_bert_weighted_sum()
+            d = self.dw + self.bert.get_bert_embed_size() + 2*self.dp
+            list_to_concatenate = [x, bert_weighted_sum, dist1, dist2]
         else:
             d = self.dw+2*self.dp
             list_to_concatenate = [x, dist1, dist2]
@@ -63,12 +67,6 @@ class CRCNN(object):
             raise Exception("You should have called a pooling function! Number of pieces cannot be None.")
         output_d = self.dc * num_pieces * len(filter_sizes)
 
-        if self.use_bert is True:
-            bert_weighted_sum = self.bert.get_bert_weighted_sum()
-            output_d += self.bert.get_bert_embed_size()
-            h_pool_flat = tf.concat([h_pool_flat, bert_weighted_sum], axis=1)
-            if self.is_training and self.keep_prob < 1:
-                h_pool_flat = tf.nn.dropout(h_pool_flat, self.keep_prob)
         
         # output
         W_o = tf.get_variable(initializer=initializer,shape=[output_d, self.nr]\
@@ -132,7 +130,7 @@ class CRCNN(object):
         elif self.use_bert is True:
             bert_layers = self.bert.get_bert_layers()
             bert_es = self.bert.get_bert_embed_size()
-            in_bert = tf.placeholder(dtype=tf.float32, shape=[None, bert_layers, bert_es],  name='in_bert')
+            in_bert = tf.placeholder(dtype=tf.float32, shape=[None, bert_layers, self.n, bert_es],  name='in_bert')
             self.bert.assign_in_bert(in_bert)
             self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_bert, in_pos1, in_pos2)
         else:
