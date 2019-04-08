@@ -13,6 +13,7 @@ import random
 import h5py # conda install -c conda-forge h5py
 from spacy.lang.en.stop_words import STOP_WORDS as stop_words
 import json
+import pandas as pd
 
 #TODO (geeticka) need to clean up utils based upon the methods that are
 # not directly used by the script anymore
