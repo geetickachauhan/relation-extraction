@@ -26,7 +26,7 @@ def set_hyperparams(config):
     learning_rate_init = round(hyperparams['learning_rate_init'], 5)
     if config.early_stop is True:
         config.patience = int(config.num_epoches/5)
-    
+
     if hyperparams['learning_rate'] == 'constant':
         config.lr_values = [float(learning_rate_init), float(learning_rate_init)]
         config.lr_boundaries = [int(config.num_epoches/2)]
@@ -81,7 +81,9 @@ def perform_assertions(config):
         if config.cross_validate is True: raise Exception("Random Search is only supported with non cross val")
         if config.use_test is True: raise Exception("You cannot use test set when performing hyperparam tuning")
     assert len(config.lr_boundaries) == len(config.lr_values) - 1
-    if config.use_elmo is True and config.use_bert is True:
+    if config.use_bert_CLS is True and config.use_bert_tokens is True:
+        raise Exception('Current version of the code only supports either bert-CLS or bert-tokens mode, not both')
+    if config.use_elmo is True and (config.use_bert_CLS is True or config.use_bert_tokens is True):
         raise Exception("Current version of the code does not support using elmo and bert embeddings at the same time")
     if config.dataset != 'semeval2010' and config.border_size != -1:
         raise Exception("Current implementation only supports border size -1 for non semeval datasets")
@@ -128,7 +130,8 @@ def log_info(log, data_size, config):
     print("seed for random initialization is ",  config.seed)
     print('use_test is', config.use_test)
     print('use_elmo is', config.use_elmo)
-    print("use_bert is ", config.use_bert)
+    print("use_bert_CLS is ", config.use_bert_CLS)
+    print("use_bert_tokens is", config.use_bert_tokens)
     log.info('total words: %d' % data_size['num_words'])
 
 # get the train and dev data , as well as early stop data in the correct form
@@ -160,9 +163,10 @@ def get_data(res, dataset, config, mode='normal'):
         if mode == 'elmo':
             train_elmo = data_utils.get_elmo_embeddings(res('elmo/train_' + config.preprocessing_type +'_border_' + str(config.border_size) + '.hdf5'))
             train_data = train_data + train_elmo
-        elif mode == 'bert':
-            train_bert = data_utils.get_bert_token_embeddings(res('bert-tokens/train_' + config.preprocessing_type + \
-                    '_border_' + str(config.border_size) + '.json'))
+        elif mode == 'bert-tokens' or mode == 'bert-CLS':
+            if mode == 'bert-tokens': bert_function = data_utils.get_bert_token_embeddings
+            elif mode == 'bert-CLS': bert_function = data_utils.get_bert_CLS_embeddings
+            train_bert = bert_function(res(mode + '/train_' + config.preprocessing_type + '_border_' + str(config.border_size) + '.json'))
             train_data = train_data + train_bert
 
         if config.use_test is False:
@@ -193,8 +197,10 @@ def get_data(res, dataset, config, mode='normal'):
             if mode == 'elmo':
                 test_elmo = data_utils.get_elmo_embeddings(res('elmo/test_' + config.preprocessing_type + '_border_' + str(config.border_size) + '.hdf5'))
                 dev_data = dev_data + test_elmo
-            if mode == 'bert': # CLS is a fixed size sentence representation - no need to pad that 
-                test_bert = data_utils.get_bert_token_embeddings(res('bert-tokens/test_' + config.preprocessing_type + \
+            if mode == 'bert-CLS' or mode == 'bert-tokens': # CLS is a fixed size sentence representation - no need to pad that 
+                if mode == 'bert-tokens': bert_function = data_utils.get_bert_token_embeddings
+                elif mode == 'bert-CLS': bert_function = data_utils.get_bert_CLS_embeddings
+                test_bert = bert_function(res(mode + '/test_' + config.preprocessing_type + \
                         '_border_' + str(config.border_size) + '.json'))
                 dev_data = dev_data + test_bert
 
@@ -256,8 +262,7 @@ def output_folder_creation(config, date_of_experiment_start):
 
     config.tensorboard_folder = config.output_folder
     config.result_folder = os.path.join(config.output_dir, folder_string, model_name, 'Result')
-    print("Tensorboard folder, for current fold is",
-            config.tensorboard_folder)
+    print("Tensorboard folder, for current fold is", config.tensorboard_folder)
     create_folder_if_not_exists(config.output_folder)
     create_folder_if_not_exists(config.tensorboard_folder)
     create_folder_if_not_exists(config.result_folder)

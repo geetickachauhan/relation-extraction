@@ -316,7 +316,7 @@ def vectorize(config, data, word_dict):
             return pos1[1], pos2[1] # this is not going to be used anyway, but using these is problematic
 
     if config.use_elmo is True: sentences, relations, e1_pos, e2_pos, elmo_embeddings = data
-    elif config.use_bert is True: sentences, relations, e1_pos, e2_pos, bert_embeddings = data
+    elif config.use_bert_CLS is True or config.use_bert_tokens is True : sentences, relations, e1_pos, e2_pos, bert_embeddings = data
     else: sentences, relations, e1_pos, e2_pos = data
     
     max_sen_len = config.max_len
@@ -328,7 +328,7 @@ def vectorize(config, data, word_dict):
     print('max sen len: {}, local max e1 len: {}, local max e2 len: {}'.format(max_sen_len, local_max_e1_len, local_max_e2_len))
 
     if config.use_elmo is True: padded_elmo_embeddings = pad_elmo_embedding(max_sen_len, elmo_embeddings)
-    if config.use_bert is True: padded_bert_embeddings = pad_elmo_embedding(max_sen_len, bert_embeddings)
+    if config.use_bert_tokens is True: padded_bert_embeddings = pad_elmo_embedding(max_sen_len, bert_embeddings)
     # maximum values needed to decide the dimensionality of the vector
     sents_vec = np.zeros((num_data, max_sen_len), dtype=int)
     e1_vec = np.zeros((num_data, max_e1_len), dtype=int)
@@ -367,7 +367,10 @@ def vectorize(config, data, word_dict):
     if config.use_elmo is True: 
         return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2, \
     padded_elmo_embeddings, position1, position2
-    if config.use_bert is True:
+    if config.use_bert_CLS is True:
+        return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2, \
+                bert_embeddings, position1, position2
+    if config.use_bert_tokens is True:
         return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2, \
                 padded_bert_embeddings, position1, position2
     return sents_vec, np.array(relations).astype(np.int64), e1_vec, e2_vec, dist1, dist2, position1, position2

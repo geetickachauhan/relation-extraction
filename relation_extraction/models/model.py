@@ -37,7 +37,8 @@ class CRCNN(object):
         self.bert = bert_wrapper(bert_es)
         self.pooling = pooling_wrapper()
         self.use_elmo = config.use_elmo
-        self.use_bert = config.use_bert
+        self.use_bert_CLS = config.use_bert_CLS
+        self.use_bert_tokens = config.use_bert_tokens
         self.use_piecewise_pool = config.use_piecewise_pool
 
     def __run__(self):
@@ -51,7 +52,7 @@ class CRCNN(object):
             elmo_weighted_sum = self.elmo.get_elmo_weighted_sum()
             d = self.dw + self.elmo.get_elmo_embed_size() + 2*self.dp
             list_to_concatenate = [x, elmo_weighted_sum, dist1, dist2]
-        elif self.use_bert is True:
+        elif self.use_bert_tokens is True:
             bert_weighted_sum = self.bert.get_bert_weighted_sum()
             d = self.dw + self.bert.get_bert_embed_size() + 2*self.dp
             list_to_concatenate = [x, bert_weighted_sum, dist1, dist2]
@@ -67,7 +68,12 @@ class CRCNN(object):
             raise Exception("You should have called a pooling function! Number of pieces cannot be None.")
         output_d = self.dc * num_pieces * len(filter_sizes)
 
-        
+        if self.use_bert_CLS is True:
+            bert_weighted_sum = self.bert.get_bert_weighted_sum()
+            output_d += self.bert.get_bert_embed_size()
+            h_pool_flat = tf.concat([h_pool_flat, bert_weighted_sum], axis=1)
+            if self.is_training and self.keep_prob < 1:
+                h_pool_flat = tf.nn.dropout(h_pool_flat, self.keep_prob)
         # output
         W_o = tf.get_variable(initializer=initializer,shape=[output_d, self.nr]\
                 ,name='w_o', regularizer=regularizer)
@@ -127,10 +133,13 @@ class CRCNN(object):
             in_elmo = tf.placeholder(dtype=tf.float32, shape=[None, elmo_layers, self.n, elmo_es],     name='in_elmo')
             self.elmo.assign_in_elmo(in_elmo)
             self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_elmo, in_pos1, in_pos2)
-        elif self.use_bert is True:
+        elif self.use_bert_tokens is True or self.use_bert_CLS is True:
             bert_layers = self.bert.get_bert_layers()
             bert_es = self.bert.get_bert_embed_size()
-            in_bert = tf.placeholder(dtype=tf.float32, shape=[None, bert_layers, self.n, bert_es],  name='in_bert')
+            if self.use_bert_tokens is True:
+                in_bert = tf.placeholder(dtype=tf.float32, shape=[None, bert_layers, self.n, bert_es],  name='in_bert')
+            elif self.use_bert_CLS is True:
+                in_bert = tf.placeholder(dtype=tf.float32, shape=[None, bert_layers, bert_es],  name='in_bert')
             self.bert.assign_in_bert(in_bert)
             self.inputs = (in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_bert, in_pos1, in_pos2)
         else:
