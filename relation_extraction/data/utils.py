@@ -31,6 +31,9 @@ class Dataset():
         if mode == 'elmo':
             return data['sentences'].tolist(), data['relations'].tolist(), data['e1_pos'].tolist(), \
                    data['e2_pos'].tolist(), data['elmo_embeddings'].tolist()
+        if mode == 'bert-CLS' or mode == 'bert-tokens':
+            return data['sentences'].tolist(), data['relations'].tolist(), data['e1_pos'].tolist(), \
+                   data['e2_pos'].tolist(), data['bert_embeddings'].tolist()
         return data['sentences'].tolist(), data['relations'].tolist(), data['e1_pos'].tolist(), \
                data['e2_pos'].tolist()
         # we need it in list format
