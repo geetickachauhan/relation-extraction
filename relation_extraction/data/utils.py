@@ -474,6 +474,7 @@ def get_bert_CLS_embeddings(filename):
     return (bert_embeddings,)
 
 # after having converted a bert embeddings json into the (layers, tokens, dimensionality) 
+# using the write_bert_tokens_without_word_pieces function
 # and merged the word piece embeddings portion, read those
 def get_bert_token_embeddings(filename):
     with open(filename, 'r', encoding='utf-8') as json_file:
