@@ -79,7 +79,7 @@ if config.use_elmo is True:
     prefix = 'elmo/'
     mode = 'elmo'
 elif config.use_bert is True:
-    prefix = 'bert/'
+    prefix = 'bert-CLS/'
     mode = 'bert'
 else: 
     prefix = ''
