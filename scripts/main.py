@@ -88,7 +88,7 @@ else:
     prefix = ''
     mode = 'normal'
 
-if config.cross_validate is True:
+if config.cross_validate is True or config.cross_validate_report is True:
     pickled_dataset = \
     data_utils.Dataset(res(prefix + 'pickled-files/seed_{K}_{folds}-fold-border_{N}{post}.pkl').format(K=config.pickle_seed,
         N=config.border_size, folds=folds, post=post))
@@ -113,8 +113,8 @@ def init():
             datefmt='%m-%d %H:%M'
         )
 
-    if config.cross_validate is True and config.fold is None or config.fold is not None and \
-            config.cross_validate is False:
+    if (config.cross_validate is True or config.cross_validate_report is True) and config.fold is None or config.fold is not None and \
+            (config.cross_validate is False and config.cross_validate_report is False):
         raise NotImplementedError("If cross validate is true, fold has to not be None")
     
     # TODO: insert checks for config.cross validate etc
@@ -226,7 +226,7 @@ def main(date_of_experiment_start):
                     dev_iter   = data_utils.batch_iter(config.seed, main_utils.stack_data(dev_vec),   bz, shuffle=False)
                     if config.early_stop is True:
                         early_stop_iter = data_utils.batch_iter(config.seed, main_utils.stack_data(early_stop_vec), bz, shuffle=False)
-                    train_verbosity = True if config.cross_validate is False else False
+                    train_verbosity = True if (config.cross_validate is False and config.cross_validate_report is False) else False
                     train_acc, _ = model_utils.run_epoch(session, m_train, train_iter, epoch,
                             config.batch_size, config.dataset, config.classnum, verbose=False, mode=mode)
 
@@ -259,7 +259,7 @@ def main(date_of_experiment_start):
                         if config.dataset == 'ddi' or config.dataset == 'i2b2': # because eval is a tuple
                             eval_metric_early_stop = eval_metric_early_stop[0]
 
-                    if config.cross_validate is False:
+                    if config.cross_validate is False and config.cross_validate_report is False:
                         print('{metric} {eval_data}: {metric_val}'.format(metric=evaluation_metric_print, 
                             eval_data=dev_or_test, metric_val=eval_metric_dev))
                         print('{0},{1:.2f},{2:.2f},{3}'.format(epoch + 1, train_acc*100, dev_acc*100,
@@ -288,7 +288,7 @@ def main(date_of_experiment_start):
                             results['epoch'][epoch]['train'] = {'accuracy': train_acc}
                             config.eval_metric_folds.append(eval_metric_dev)
 
-                            if config.cross_validate is True:
+                            if config.cross_validate is True or config.cross_validate_report is True:
                                 print('Last epoch {metric} {eval_data}: {metric_val}'.format(metric=evaluation_metric_print,
                                             eval_data=dev_or_test, metric_val=eval_metric_dev))
                                 print('{0},{1:.2f},{2:.2f},{3}'.format(epoch+1, train_acc*100,
@@ -297,7 +297,7 @@ def main(date_of_experiment_start):
 
                     if epoch == config.num_epoches - 1:
                         config.eval_metric_folds.append(eval_metric_dev)
-                        if config.cross_validate is True:
+                        if config.cross_validate is True or config.cross_validate_report is True:
                             print('Last epoch {metric} {eval_data}: {metric_val}'.format(metric=evaluation_metric_print, 
                                 eval_data=dev_or_test, metric_val=eval_metric_dev))
                             print(
@@ -337,9 +337,10 @@ if __name__ == '__main__':
     # see https://stackoverflow.com/questions/34344836/will-hashtime-time-always-be-unique
 
     print("Cross validate is ", config.cross_validate)
+    print("Cross validate report is ", config.cross_validate_report)
 
 
-    if config.cross_validate is True:
+    if config.cross_validate is True or config.cross_validate_report is True:
         num_folds = folds
         for config.fold in range(0, num_folds):
             start_time = time.time()

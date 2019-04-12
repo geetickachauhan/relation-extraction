@@ -78,7 +78,7 @@ def dump_csv(config, parameters, num_folds, date, evaluation_metric_print, postf
 
 def perform_assertions(config):
     if config.hyperparam_tuning_mode is True and config.random_search is True:
-        if config.cross_validate is True: raise Exception("Random Search is only supported with non cross val")
+        if config.cross_validate is True or config.cross_validate_report is True: raise Exception("Random Search is only supported with non cross val")
         if config.use_test is True: raise Exception("You cannot use test set when performing hyperparam tuning")
     assert len(config.lr_boundaries) == len(config.lr_values) - 1
     if config.use_bert_CLS is True and config.use_bert_tokens is True:
@@ -162,7 +162,7 @@ def get_data(res, dataset, config, mode='normal'):
 
     # if you are using the pickle file with unsplit sentences, you will do the following:
     # random select dev set when there is no cross validation
-    if config.cross_validate is False:
+    if config.cross_validate is False and config.cross_validate_report is False:
         # split data
         train_data = preprocess_data_noncrossvalidated(train_data, config.border_size)
         if mode == 'elmo':
@@ -220,7 +220,7 @@ def get_data(res, dataset, config, mode='normal'):
                 train_data = transpose(train_data)
 
     # only need below if doing early stop
-    if config.early_stop is True and config.cross_validate is True:
+    if config.early_stop is True and (config.cross_validate is True or config.cross_validate_report is True):
         early_stop_size = int(len(train_data[0])*config.early_stop_size)
         select_index = random.sample(range(0, len(train_data[0])), early_stop_size)
         new_train_data = []
@@ -257,7 +257,7 @@ def output_folder_creation(config, date_of_experiment_start):
     model_name = 'cnn_{0}'.format(config.id + '_' + date_of_experiment_start + hyperparam_dir_addition)
     
     config.parameters = parameters
-    if config.cross_validate is True:
+    if config.cross_validate is True or config.cross_validate_report is True:
         folder_string = "CrossValidation"
         config.output_folder = os.path.join(config.output_dir, "CrossValidation", model_name, 'Fold'+str(config.fold))
     else:
@@ -355,7 +355,7 @@ def test_writer(scores, answer_path):
                 for score in scores:
                         inFile.write('\t'.join([str(item) for item in score])+'\n')
 
-        if config.cross_validate is False:
+        if config.cross_validate is False and config.cross_validate is False:
             print('Answer file writting done!')
 
 def test_writer_for_perl_evaluation(relations, preds, answer_dict, answer_path):
