@@ -52,7 +52,7 @@ def run_epoch(session, model, batch_iter, epoch, batch_size, dataset, classnum, 
             feed_dict = {in_x: sents, in_e1: e1, in_e2: e2, in_dist1: dist1, in_dist2: dist2, \
                     in_y: relations, in_epoch: epoch, in_elmo: elmo_embeddings, in_pos1: position1, \
                     in_pos2: position2}
-        if mode == 'bert-CLS' or mode == 'bert-tokens': 
+        elif mode == 'bert-CLS' or mode == 'bert-tokens': 
             in_x, in_e1, in_e2, in_dist1, in_dist2, in_y, in_epoch, in_bert, in_pos1, in_pos2 = model.inputs
             feed_dict = {in_x: sents, in_e1: e1, in_e2: e2, in_dist1: dist1, in_dist2: dist2, \
                     in_y: relations, in_epoch: epoch, in_bert: bert_embeddings, in_pos1: position1, \
