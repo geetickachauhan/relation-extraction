@@ -300,6 +300,25 @@ def pad_elmo_embedding(max_len, elmo_embeddings):
         new_elmo_embeddings.append(appended_array)
     return new_elmo_embeddings
 
+def pad_bert_embedding(max_len, bert_embeddings):
+    new_bert_embeddings = []
+    for i in range(0, len(bert_embeddings)):
+        sentence = bert_embeddings[i]
+        num_of_words_to_pad = max_len - sentence.shape[1]
+        if num_of_words_to_pad < 0:
+            sentence_len = len(sentence[0])
+            print("Warning! the sentence length %d is larger than %d! Shaving down some" %(
+                sentence_len, max_len))
+            sentence = np.array(sentence, dtype='float32')
+            appended_array = sentence[:, :max_len, :]
+            new_bert_embeddings.append(appended_array)
+            continue
+        array_to_pad = np.zeros(shape=(sentence.shape[0], num_of_words_to_pad, sentence.shape[2]),
+                dtype='float32')
+        appended_array = np.append(sentence, array_to_pad, axis=1)
+        new_bert_embeddings.append(appended_array)
+    return new_bert_embeddings
+
 def vectorize(config, data, word_dict):
     def assign_splits(pos1, pos2):
         if pos1[1] < pos2[1]:
@@ -331,7 +350,7 @@ def vectorize(config, data, word_dict):
     print('max sen len: {}, local max e1 len: {}, local max e2 len: {}'.format(max_sen_len, local_max_e1_len, local_max_e2_len))
 
     if config.use_elmo is True: padded_elmo_embeddings = pad_elmo_embedding(max_sen_len, elmo_embeddings)
-    if config.use_bert_tokens is True: padded_bert_embeddings = pad_elmo_embedding(max_sen_len, bert_embeddings)
+    if config.use_bert_tokens is True: padded_bert_embeddings = pad_bert_embedding(max_sen_len, bert_embeddings)
     # maximum values needed to decide the dimensionality of the vector
     sents_vec = np.zeros((num_data, max_sen_len), dtype=int)
     e1_vec = np.zeros((num_data, max_e1_len), dtype=int)
