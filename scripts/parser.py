@@ -105,7 +105,9 @@ parser.add_argument('--log_file', default=None,
 parser.add_argument('--early_stop_size', default=0.5, type=float,
                                                 help='early stop size as a percentage of train set')
 parser.add_argument('--cross_validate', default=False, action='store_true',
-                                                help='whether to implement cross validation')
+                                                help='whether to implement cross validation (use for hyperparam tuning')
+parser.add_argument('--cross_validate_report', default=False, action='store_true',
+                                                help='whether to implement cross validation for reporting purposes')
 parser.add_argument('--use_test', default=False, action='store_true',
                                                 help='use the full train and test data split')
 parser.add_argument('--use_elmo', default=False, action='store_true',
@@ -174,6 +176,7 @@ def get_results_dict(config, train_start_time_in_miliseconds):
 
     parameters['early_stop_size'] = config.early_stop_size
     parameters['cross_validate'] = config.cross_validate
+    parameters['cross_validate_report'] = config.cross_validate_report
     parameters['use_test'] = config.use_test
     parameters['use_elmo'] = config.use_elmo
     parameters['use_bert_CLS'] = config.use_bert_CLS

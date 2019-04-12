@@ -206,6 +206,8 @@ def main(date_of_experiment_start):
         configProto.gpu_options.allow_growth = True
 
         with sv.managed_session(config=configProto) as session:
+            if config.cross_validate_report is True:
+                print("Currently reporting on evaluation fold on cross validation for reporting\n")
             print('Format of evaluation printing is as follows')
             dev_or_test = 'dev' if config.use_test is False else 'test'
             print('{metric} {eval_data}: {metric_val}'.format(metric=evaluation_metric_print, 

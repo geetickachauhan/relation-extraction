@@ -43,9 +43,14 @@ class Dataset():
         return data.values.tolist()
 
     # when reporting the scores for the paper, will merge dev and train set and will grab 0th fold of test
-    def get_train_dev_data(self):
-        data = pd.concate([self.relations_splits[0][t] for t in [TRAIN, DEV]])
-        return data.values.tolist()
+    def get_train_dev_data_for_fold(self, fold_num, mode='normal'):
+        train_data = self.get_data_for_fold(fold_num, data_type=TRAIN, mode=mode)
+        dev_data = self.get_data_for_fold(fold_num, data_type=DEV, mode=mode)
+        if mode == 'elmo' or mode == 'bert-CLS' or mode == 'bert-tokens':
+            return train_data[0] + dev_data[0], train_data[1] + dev_data[1], train_data[2] + dev_data[2], \
+                    train_data[3] + dev_data[3], train_data[4] + dev_data[4]
+        return train_data[0] + dev_data[0], train_data[1] + dev_data[1], train_data[2] + dev_data[2],\
+                train_data[3] + dev_data[3]
 
 # given a string that looks like a list, parse it into an actual list
 def argument_to_list(argument):

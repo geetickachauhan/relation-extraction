@@ -87,8 +87,10 @@ def perform_assertions(config):
         raise Exception("Current version of the code does not support using elmo and bert embeddings at the same time")
     if config.dataset != 'semeval2010' and config.border_size != -1:
         raise Exception("Current implementation only supports border size -1 for non semeval datasets")
-    if config.use_test is True and config.cross_validate is True:
+    if config.use_test is True and (config.cross_validate is True or config.cross_validate_report is True):
         raise NotImplementedError("You cannot use test data and perform cross validation at the same time")
+    if config.cross_validate is True and config.cross_validate_report is True:
+        raise NotImplementedError("You cannot perform regular cross val with cross val at the reporting mode at the same time")
     if config.use_elmo is True and config.preprocessing_type != 'original' and config.dataset != 'i2b2' and \
             config.dataset != 'ddi':
         raise NotImplementedError("You can only use the elmo embeddings with the original preprocessing")
@@ -146,11 +148,14 @@ def get_data(res, dataset, config, mode='normal'):
     # setting the train, dev data; pretend that test data does not exist
     train_text_dataset_file = res(config.train_text_dataset_path)
     test_text_dataset_file = res(config.test_text_dataset_path)
-    if config.cross_validate is False:
+    if config.cross_validate is False and config.cross_validate_report is False:
         train_data = main_utils.openFileAsList(train_text_dataset_file)
-    else:
+    elif config.cross_validate is True:
         train_data = dataset.get_data_for_fold(config.fold, mode=mode)
         dev_data = dataset.get_data_for_fold(config.fold, DEV, mode=mode)
+    elif config.cross_validate_report is True:
+        train_data = dataset.get_train_dev_data_for_fold(config.fold, mode=mode)
+        dev_data = dataset.get_data_for_fold(config.fold, TEST, mode=mode)
 
     # now each of the above data contains the following in order:
     # sentences, relations, e1_pos, e2_pos
