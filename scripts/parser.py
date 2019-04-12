@@ -79,7 +79,7 @@ parser.add_argument('--embedding_file', default='/data/medg/misc/geeticka/relati
 parser.add_argument('--embedding_vocab', default='/data/medg/misc/geeticka/relation_extraction/senna/words.lst',
                                                 help='embedding vocab file')
 parser.add_argument('--data_root',
-        default="/data/medg/misc/geeticka/relation_extraction/semeval_2010/pre-processed/original/",
+        default="/data/scratch-oc40/geeticka/relation_extraction/semeval_2010/pre-processed/original/",
                                                 help= "Data root directory")
 parser.add_argument('--train_text_dataset_path', default='train_original.txt',
                                                 help='test file')
