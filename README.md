@@ -10,13 +10,13 @@ REflex has experimental as well as design goals. The experimental goals are in i
 In order to replicate experiments for this work, generate the data beyond the pre-processing stage by going into the notebooks/ folder and following the README.md instructions there. 
 
 The hierarchy of this code is organized as follows:
-1. relation\_extraction stores the main components of the framework, including converters, pre-processing module and models
+1. relation_extraction stores the main components of the framework, including converters, pre-processing module and models
 2. eval/ contains the evaluation scripts used to evaluate the model
 3. scripts/ which contains the scripts to run the model
 
-Refer to the jupyter notebooks in the notebooks/Data-Preprocessing folder and the ones marked with \_original to know how to use the converter.
+Refer to the jupyter notebooks in the notebooks/Data-Preprocessing folder and the ones marked with _original to know how to use the converter.
 
-In order to run the model, cd into the scripts/ folder and type ```python main.py --cross\_validate --dataset=ddi```
+In order to run the model, cd into the scripts/ folder and type ```python main.py --cross_validate --dataset=ddi```
 
 Relation Extraction with Semeval 2010 data, i2b2 2010 VA challenge classification data and DDI extraction data.
 
