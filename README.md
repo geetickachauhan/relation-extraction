@@ -16,7 +16,7 @@ The hierarchy of this code is organized as follows:
 
 Refer to the jupyter notebooks in the notebooks/Data-Preprocessing folder and the ones marked with _original to know how to use the converter.
 
-In order to run the model, cd into the scripts/ folder and type ```python main.py --cross_validate --dataset=ddi```
+In order to run the model, cd into the scripts/ folder and type sample command ```python main.py --cross_validate --dataset=ddi``` Look at notebooks/commands.md for a list of official commands that were run for experiments. 
 
 Relation Extraction with Semeval 2010 data, i2b2 2010 VA challenge classification data and DDI extraction data.
 
