@@ -1,0 +1,54 @@
+Paper,Cited by,Code publicly available,Ablation study,Mention Hyperparam Details,Cross Val method details mentioned,Mention word embedding details,Number of Datasets
+\citet{socher2012semantic},890,y,\textbullet,y,\textbullet,y,2
+\citet{zeng2014relation},477,\textbullet,y,y,y,y,1
+\citet{santos2015classifying},220,\textbullet,y,y,y,y,1
+\citet{nguyen2018convolutional},146,\textbullet,y,y,y,\textbullet,2
+\citet{miwa2016end},175,\textbullet,y,y,y,\textbullet,3
+\citet{li2015multi},107,y,y,y,\textbullet,y,6
+\citet{xu2015semantic},108,\textbullet,y,y,\textbullet,y,1
+\citet{wang2016relation},102,\textbullet,y,\textbullet,\textbullet,y,1
+\citet{hashimoto2013simple},64,\textbullet,y,y,\textbullet,y,1
+\citet{zhang2015relation},68,\textbullet,y,\textbullet,y,y,2
+\citet{vu2016combining},57,\textbullet,y,y,\textbullet,y,1
+\citet{yin2017comparative},116,\textbullet,n ,y,\textbullet,\textbullet,7
+\citet{yu2014factor},45,y,y,y,y,y,1
+\citet{xu2016recurrent},54,y ,y,y,\textbullet,\textbullet,1
+\citet{zhang2015bidirectional},51,\textbullet,\textbullet,\textbullet,\textbullet,y,1
+\citet{nguyen2015combining},42,\textbullet,y,y,\textbullet,y,2
+\citet{qin2016empirical},39,\textbullet,\textbullet,y,y,y,1
+\citet{cai2016bidirectional},44,\textbullet,y ,y,\textbullet,y,1
+\citet{sahu2016clinical},32,\textbullet,y,y,y,y,1
+\citet{adel2016comparing},29,y ,y,\textbullet,\textbullet,y,1
+\citet{zeng2015distant},190,\textbullet,y,y,\textbullet,y,1
+\citet{xu2015classifying},171,\textbullet,y,y,\textbullet,y,1
+\citet{zhang2018graphconvolution},3,\textbullet,y,y,\textbullet,y,2
+\citet{omer2017zero},20,y,y,y,\textbullet,y,1
+\citet{liu2016drug},48,\textbullet,\textbullet,y,\textbullet,y,1
+\citet{zhao2016drug},41,y ,y ,y,\textbullet,y,1
+\citet{ebrahimi2015chain},30,\textbullet,\textbullet,\textbullet,\textbullet,\textbullet,2
+\citet{li2017neural},27,y,y,y,y,y,2
+\citet{quan2016multichannel},23,y,\textbullet,y,y,y,2
+\citet{sahu2018LSTM},13,y ,y,y,\textbullet,y,1
+\citet{liu2016dependency},9,\textbullet,\textbullet,y,\textbullet,y,1
+\citet{lim2018drugrecursive},4,\textbullet,\textbullet,\textbullet,\textbullet,\textbullet,1
+\citet{zheng2017attention},12,\textbullet,y,y,y,y,1
+\citet{wang2017dependency},5,n ,y,y,\textbullet,y,1
+\citet{lim2018drug},1,y ,y,y,y,y,2
+\citet{kavuluru2017extracting},8,\textbullet,\textbullet,y,\textbullet,\textbullet,1
+\citet{huang2017SVMLSTM},4,\textbullet,\textbullet,y,\textbullet,y,1
+\citet{juan2018extraction},1,\textbullet,\textbullet,\textbullet,\textbullet,y,1
+\citet{lim2018chemicalgene},4,y,\textbullet,y,\textbullet,y,1
+\citet{rotsztejn2018semeval},2,\textbullet,\textbullet,y,y,y,1
+\citet{jin2018semeval},0,\textbullet,y ,y,y,y,1
+\citet{sahu2016clinical},31,\textbullet,y,y,y,y,1
+\citet{luo2017recurrent},21,\textbullet,\textbullet,y,\textbullet,y,1
+\citet{lv2016clinical},15,\textbullet,\textbullet,\textbullet,\textbullet,\textbullet,1
+\citet{jin2018semeval},14,\textbullet,y,y,\textbullet,y,1
+\citet{chikka2018AHD},1,y,\textbullet,y,\textbullet,\textbullet,1
+\citet{li2018classifying},0,y ,\textbullet,y,y,y,1
+\citet{q2018multitask},0,\textbullet,\textbullet,\textbullet,\textbullet,\textbullet,5
+\citet{suster2018revisiting},0,y,\textbullet,y,\textbullet,y,1
+\citet{luo2017segment},16,y,\textbullet,y,\textbullet,y,1
+\citet{he2018classifying},2,\textbullet,\textbullet,y,\textbullet,y,1
+\citet{He2018ConvolutionalGR},0,\textbullet,\textbullet,y,y,y,2
+\citet{nguyen2018convolutional},1,\textbullet,y ,y,\textbullet,y,1
