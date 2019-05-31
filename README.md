@@ -7,7 +7,9 @@ REflex is a unifying framework for Relation Extraction, applied on 3 highly used
 
 REflex has experimental as well as design goals. The experimental goals are in identification of sources of variability in results for the 3 datasets and provide the field with a strong baseline model to compare against for future improvements. The design goals are in identification of best practices for relation extraction and to be a guide for approaching new datasets.
 
-The hierarchy is organized as follows:
+In order to replicate experiments for this work, generate the data beyond the pre-processing stage by going into the notebooks/ folder and following the README.md instructions there. 
+
+The hierarchy of this code is organized as follows:
 1. relation\_extraction stores the main components of the framework, including converters, pre-processing module and models
 2. eval/ contains the evaluation scripts used to evaluate the model
 3. scripts/ which contains the scripts to run the model
