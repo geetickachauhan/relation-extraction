@@ -1,3 +1,8 @@
+'''
+Author: Geeticka Chauhan
+Utilities used by the model.py class
+'''
+
 import time
 import numpy as np
 import tensorflow as tf

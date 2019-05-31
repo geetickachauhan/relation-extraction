@@ -1,3 +1,9 @@
+'''
+Author: Geeticka Chauhan
+Parser for hyperparameters with the default ones used in this work. 
+'''
+
+
 import argparse
 import copy
 import time

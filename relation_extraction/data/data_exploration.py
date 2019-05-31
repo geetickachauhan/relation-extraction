@@ -1,3 +1,8 @@
+'''
+Author: Geeticka Chauhan
+Accompanies the notebooks/Data-Exploration ipynb notebooks
+'''
+
 import pandas as pd
 from collections import Counter
 

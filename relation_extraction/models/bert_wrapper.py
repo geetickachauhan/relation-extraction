@@ -1,3 +1,8 @@
+'''
+Author: Geeticka Chauhan
+A wrapper class for the BERT contextualized embeddings
+'''
+
 import tensorflow as tf
 
 class bert_wrapper(object):

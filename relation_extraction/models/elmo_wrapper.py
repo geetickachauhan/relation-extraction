@@ -1,3 +1,8 @@
+'''
+Author: Geeticka Chauhan
+A wrapper class for the ELMo contextualized embeddings
+'''
+
 import tensorflow as tf
 
 class elmo_wrapper(object):

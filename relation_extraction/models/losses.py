@@ -1,3 +1,8 @@
+'''
+Author: Geeticka Chauhan
+Utilities for the loss used in this model
+'''
+
 import tensorflow as tf
 
 def ranking_loss(in_y, scores, nr, m_plus, m_minus, gamma, name=None):

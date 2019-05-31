@@ -1,3 +1,9 @@
+'''
+Author: Geeticka Chauhan
+Utilities to summarize the outputs produced by the model i.e. the results.txt files spitted out by the 
+evaluation scripts. 
+'''
+
 import os
 from sys import path
 import re

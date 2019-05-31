@@ -1,3 +1,8 @@
+'''
+Author: Geeticka Chauhan
+Main model class: an implementation of the CRCNN class by https://www.aclweb.org/anthology/P15-1061
+'''
+
 import tensorflow as tf
 import sys
 sys.path.append('../../')

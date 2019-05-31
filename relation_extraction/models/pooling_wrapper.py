@@ -1,3 +1,8 @@
+'''
+Author: Geeticka Chauhan
+A wrapper class for piecewise pooling
+'''
+
 import tensorflow as tf
 
 class pooling_wrapper(object):

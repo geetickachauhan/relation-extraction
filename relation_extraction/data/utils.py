@@ -1,3 +1,9 @@
+'''
+Author: Geeticka Chauhan
+Miscellaneous data related utilities used by the main.py file in the scripts folder. 
+'''
+
+
 import numpy as np
 import logging
 from collections import Counter

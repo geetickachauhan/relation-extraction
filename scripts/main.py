@@ -1,3 +1,9 @@
+'''
+Author: Geeticka Chauhan
+Main file to be run for replicating experiments in this work
+'''
+
+
 from __future__ import print_function
 from __future__ import division
 

@@ -1,3 +1,10 @@
+'''
+Author: Geeticka Chauhan
+Performs pre-processing on a csv file independent of the dataset (once converters have been applied). 
+Refer to notebooks/Data-Preprocessing for more details. The methods are specifically used in the non
+_original notebooks for all datasets.
+'''
+
 import os, pandas as pd, numpy as np
 import nltk
 import spacy
