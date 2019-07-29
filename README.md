@@ -3,6 +3,8 @@
 
 ![Framework](https://github.com/geetickachauhan/relation-extraction/blob/master/img/framework.png)
 
+Paper: http://arxiv.org/abs/1906.08318
+
 REflex is a unifying framework for Relation Extraction, applied on 3 highly used datasets (from the general, biomedical and clinical domains), with the ability to be extendable to new datasets.
 
 REflex has experimental as well as design goals. The experimental goals are in identification of sources of variability in results for the 3 datasets and provide the field with a strong baseline model to compare against for future improvements. The design goals are in identification of best practices for relation extraction and to be a guide for approaching new datasets.
